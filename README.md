@@ -12,8 +12,8 @@ Zero dependencies. No install, no account, no config.
 ## How it works
 
 The document is compressed and packed into the URL's **fragment** — the part
-after `#`. Fragments are never sent to a server, so for links under 2000
-characters nothing you write leaves your machine. Opening the link renders it
+after `#`. Fragments are never sent to a server, so for links 2000 characters
+or fewer nothing you write leaves your machine. Opening the link renders it
 entirely in the browser.
 
 ## Usage

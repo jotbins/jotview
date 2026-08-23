@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { randomBytes } from "node:crypto";
 import { run, DEFAULT_BASE_URL } from "../src/cli.js";
 import { encode } from "../src/codec.js";
 
@@ -16,6 +17,11 @@ const dir = mkdtempSync(join(tmpdir(), "jotview-"));
 async function runCli(args, { input } = {}) {
   try {
     const child = execFileAsync(process.execPath, [BIN, ...args]);
+    // If the child exits (e.g. an oversized-input test rejects) before this
+    // process has finished writing a large `input`, the write side sees
+    // EPIPE. That is expected here and not the thing under test, so swallow
+    // it rather than letting an unhandled stream error crash the test run.
+    child.child.stdin.on("error", () => {});
     if (input !== undefined) {
       child.child.stdin.end(input);
     } else {
@@ -57,6 +63,39 @@ test("--base-url overrides the host", async () => {
   const p = fixture("base.md", "# Base\n");
   const { stdout } = await runCli([p, "--base-url", "http://localhost:5173", "--raw"]);
   assert.match(stdout.trim(), /^http:\/\/localhost:5173\/d#z:/);
+});
+
+test("--base-url rejects a missing value", async () => {
+  const p = fixture("base-missing.md", "# Base\n");
+  const { code, stderr } = await runCli([p, "--base-url"]);
+  assert.equal(code, 2);
+  assert.match(stderr, /--base-url/);
+  assert.match(stderr, /Usage:/);
+});
+
+test("--base-url rejects a value that looks like another flag", async () => {
+  const p = fixture("base-flag.md", "# Base\n");
+  const { code, stdout, stderr } = await runCli([p, "--base-url", "--raw"]);
+  assert.equal(code, 2);
+  assert.equal(stdout, "");
+  assert.match(stderr, /--base-url/);
+  assert.match(stderr, /Usage:/);
+});
+
+test("--base-url rejects a value without an http(s) scheme", async () => {
+  const p = fixture("base-scheme.md", "# Base\n");
+  const { code, stdout, stderr } = await runCli([p, "--base-url", "ftp://example.com"]);
+  assert.equal(code, 2);
+  assert.equal(stdout, "");
+  assert.match(stderr, /--base-url/);
+  assert.match(stderr, /Usage:/);
+});
+
+test("--base-url rejects an empty value", async () => {
+  const p = fixture("base-empty.md", "# Base\n");
+  const { code, stderr } = await runCli([p, "--base-url", ""]);
+  assert.equal(code, 2);
+  assert.match(stderr, /--base-url/);
 });
 
 test("--help exits 0 and writes usage to stdout", async () => {
@@ -108,6 +147,15 @@ test("oversized input exits 1 and names the size", async () => {
   assert.match(stderr, /1000001|limit/);
 });
 
+test("a runaway stdin pipe exits 1 and names the limit instead of buffering it all", async () => {
+  // Several times MAX_DOC_BYTES: readStdin() must reject once the running
+  // total crosses the limit, not after accumulating the entire input.
+  const { code, stdout, stderr } = await runCli([], { input: "x".repeat(5_000_000) });
+  assert.equal(code, 1);
+  assert.equal(stdout, "");
+  assert.match(stderr, /limit/);
+});
+
 test("a small document is not shortened and stays local", async () => {
   const p = fixture("small.md", "# Small\n");
   const { code, stdout, stderr } = await runCli([p]);
@@ -116,19 +164,45 @@ test("a small document is not shortened and stays local", async () => {
   assert.doesNotMatch(stderr, /uploaded/);
 });
 
-test("--short with a custom base URL is a usage error", async () => {
-  const p = fixture("custom.md", "# Custom\n");
-  const { code, stderr } = await runCli([p, "--base-url", "http://localhost:5173", "--short"]);
+test("--short with a custom base URL is a usage error, detected before any I/O", async () => {
+  // Name a file that does not exist: if the check fired only after reading
+  // input (the old bug), this would instead fail with a read error.
+  const { code, stdout, stderr } = await runCli([
+    join(dir, "does-not-exist.md"), "--base-url", "http://localhost:5173", "--short",
+  ]);
   assert.equal(code, 2);
+  assert.equal(stdout, "");
   assert.match(stderr, /--short/);
+  assert.match(stderr, /Usage:/);
 });
 
-test("a large document with a custom base URL emits the raw link, no upload", async () => {
-  const p = fixture("large-custom.md", "# Big\n\n" + "unique words here ".repeat(4000));
+test("a large document with a custom base URL emits the raw link, no upload, and notes shortening was skipped", async () => {
+  // Varied per-line text, not a repeated string — repetition compresses so
+  // well that the resulting URL would land back under the threshold and this
+  // test would no longer exercise the skip-note path at all.
+  const md = "# Big\n\n" + Array.from(
+    { length: 2000 },
+    (_, i) => `## Section ${i} with unique text ${i}\n`,
+  ).join("");
+  const p = fixture("large-custom.md", md);
+
+  const rawUrl = `http://localhost:5173/d#${encode(md)}`;
+  assert.ok(rawUrl.length > 2000, `expected rawUrl over 2000 chars, got ${rawUrl.length}`);
+
   const { code, stdout, stderr } = await runCli([p, "--base-url", "http://localhost:5173"]);
   assert.equal(code, 0);
   assert.match(stdout.trim(), /^http:\/\/localhost:5173\/d#z:/);
   assert.doesNotMatch(stderr, /uploaded/);
+  assert.match(stderr, /shortening skipped/);
+  assert.match(stderr, new RegExp(DEFAULT_BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("a small document with a custom base URL does not nag about skipped shortening", async () => {
+  const p = fixture("small-custom.md", "# Small\n");
+  const { code, stdout, stderr } = await runCli([p, "--base-url", "http://localhost:5173"]);
+  assert.equal(code, 0);
+  assert.match(stdout.trim(), /^http:\/\/localhost:5173\/d#z:/);
+  assert.doesNotMatch(stderr, /shortening skipped/);
 });
 
 test("upload disclosure: a shortened document warns on stderr with both lengths", async () => {
@@ -170,6 +244,52 @@ test("upload disclosure: a shortened document warns on stderr with both lengths"
     assert.match(stderr, /uploaded to jotbins to shorten/);
     assert.match(stderr, new RegExp(String(rawUrl.length)));
     assert.match(stderr, new RegExp(String(shortUrl.length)));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a failed shorten admits the document may still have reached the shortener", async () => {
+  // Varied text, not a repeated string — same reasoning as the upload
+  // disclosure test: repetition compresses under the shorten threshold and
+  // would silently skip the branch under test.
+  const md = "# Big\n\n" + Array.from(
+    { length: 2000 },
+    (_, i) => `## Section ${i} with unique text ${i}\n`,
+  ).join("");
+  const p = fixture("shorten-fail.md", md);
+
+  const rawUrl = `${DEFAULT_BASE_URL}/d#${encode(md)}`;
+  assert.ok(rawUrl.length > 2000, `expected rawUrl over 2000 chars, got ${rawUrl.length}`);
+
+  const originalFetch = globalThis.fetch;
+  // Stub fetch for the duration of this test only — no network call is ever
+  // made; the request body (containing the whole document) is never sent
+  // anywhere real, but the point under test is that jotview cannot know
+  // that from a 500 — the upload may have already landed server-side.
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 500,
+    json: async () => ({}),
+  });
+
+  let stdout = "";
+  let stderr = "";
+  try {
+    const code = await run([p], {
+      stdout: (s) => { stdout += s; },
+      stderr: (s) => { stderr += s; },
+      stdin: process.stdin,
+      isTTY: false,
+      version: "0.1.0",
+    });
+
+    assert.equal(code, 0);
+    assert.equal(stdout, `${rawUrl}\n`);
+    // The critical claim: a failed shorten must NOT be reported as though
+    // nothing left the machine — the request body already went out.
+    assert.match(stderr, /upload to the shortener failed/);
+    assert.match(stderr, /may still have reached surl\.jotbins\.com/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -245,4 +365,31 @@ test("--copy is best-effort: a failing clipboard command still exits 0 and warns
   assert.equal(code, 0);
   assert.match(stdout.trim(), /^https:\/\/jotbins\.com\/d#z:[A-Za-z0-9\-_]+$/);
   assert.match(stderr, /could not copy/);
+});
+
+test("EPIPE: a downstream reader that exits early does not crash jotview", async () => {
+  // Base64 of random bytes is close to incompressible by deflate (unlike
+  // repeated filler), so the emitted URL scales ~1:1 with input size. Aim
+  // comfortably past the 64 KB pipe buffer so the write is still in flight
+  // — and can still receive EPIPE — when `head` closes its end early.
+  const md = "# Big\n\n" + randomBytes(60_000).toString("base64");
+  const p = fixture("epipe.md", md);
+  const rawUrl = `${DEFAULT_BASE_URL}/d#${encode(md)}`;
+  assert.ok(rawUrl.length > 65_536, `expected rawUrl over 64 KiB, got ${rawUrl.length}`);
+
+  // `head -c 5` is the downstream reader that exits after 5 bytes, closing
+  // its read end while jotview is still writing. PIPESTATUS[0] recovers
+  // jotview's own exit code, since `exec()`'s callback otherwise reports
+  // the exit status of the last command in the pipeline (`head`).
+  const script = `${JSON.stringify(process.execPath)} ${JSON.stringify(BIN)} ` +
+    `--raw ${JSON.stringify(p)} | head -c 5 >/dev/null; exit "\${PIPESTATUS[0]}"`;
+
+  const code = await new Promise((resolve, reject) => {
+    execFile("bash", ["-c", script], (err) => {
+      if (err && typeof err.code !== "number") { reject(err); return; }
+      resolve(err ? err.code : 0);
+    });
+  });
+
+  assert.equal(code, 0);
 });

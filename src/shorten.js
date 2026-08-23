@@ -44,7 +44,11 @@ export async function shorten(url, options = {}) {
       return { ok: false, reason: `shortener returned ${response.status}` };
     }
     const data = await response.json();
-    if (typeof data?.short_url !== "string") {
+    // The value ends up on stdout and, with --open, as an argv element handed
+    // to `spawnSync("open", [value])`. Requiring an https:// scheme rules out
+    // a misbehaving or compromised shortener returning something like "-a" or
+    // a `javascript:` URL that a browser or shell would treat specially.
+    if (typeof data?.short_url !== "string" || !data.short_url.startsWith("https://")) {
       return { ok: false, reason: "shortener returned an unexpected response" };
     }
     return { ok: true, short: data.short_url };

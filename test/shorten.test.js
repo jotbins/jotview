@@ -88,6 +88,19 @@ test("shorten: connection refused fails soft", async () => {
   assert.equal(result.ok, false);
 });
 
+test("shorten: a non-https short_url fails soft instead of being trusted", async () => {
+  await withServer((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    // A misbehaving or compromised shortener; this value would otherwise
+    // reach stdout and, with --open, argv of a spawned "open" command.
+    res.end(JSON.stringify({ short_url: "javascript:alert(1)" }));
+  }, async (endpoint) => {
+    const result = await shorten(long, { endpoint });
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /unexpected/i);
+  });
+});
+
 test("shorten: posts the URL as JSON", async () => {
   let seen = null;
   await withServer((req, res) => {

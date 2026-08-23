@@ -1,8 +1,14 @@
 import { readFileSync } from "node:fs";
-import { encode, JotviewError } from "./codec.js";
-import { shorten, shouldShorten, DEFAULT_BASE_URL } from "./shorten.js";
+import { encode, JotviewError, MAX_DOC_BYTES } from "./codec.js";
+import {
+  shorten, shouldShorten, DEFAULT_BASE_URL, SHORTEN_THRESHOLD, SHORTENER_URL,
+} from "./shorten.js";
 import { openUrl, copyText } from "./platform.js";
 export { DEFAULT_BASE_URL };
+
+/** Host the failed-shorten disclosure points to — derived from SHORTENER_URL
+ *  so the two never drift apart. */
+const SHORTENER_HOST = new URL(SHORTENER_URL).host;
 
 export const HELP = `jotview — turn markdown into a jotbins /d link
 
@@ -19,7 +25,7 @@ Options:
   -h, --help                show this help
   -v, --version             show the version
 
-Links under 2000 characters are printed as-is and never leave your machine.
+Links 2000 characters or fewer are printed as-is and never leave your machine.
 Longer ones are shortened via surl.jotbins.com, which uploads the document.
 Use --raw to keep it local regardless of size.
 `;
@@ -57,7 +63,14 @@ export function parseArgs(argv) {
       case "-v": case "--version": opts.version = true; break;
       case "--base-url": {
         const value = argv[++i];
-        if (value === undefined) throw new JotviewError("usage", "--base-url needs a URL");
+        if (
+          value === undefined || value.startsWith("-") || !/^https?:\/\//.test(value)
+        ) {
+          throw new JotviewError(
+            "usage",
+            "--base-url needs an absolute http:// or https:// URL",
+          );
+        }
         opts.baseUrl = value.replace(/\/+$/, "");
         break;
       }
@@ -70,6 +83,9 @@ export function parseArgs(argv) {
   if (opts.raw && opts.short) {
     throw new JotviewError("usage", "--raw and --short cannot be combined");
   }
+  if (opts.short && opts.baseUrl !== DEFAULT_BASE_URL) {
+    throw new JotviewError("usage", `--short only works with ${DEFAULT_BASE_URL}`);
+  }
   return opts;
 }
 
@@ -77,7 +93,20 @@ export function parseArgs(argv) {
 async function readStdin(stdin) {
   /** @type {Buffer[]} */
   const chunks = [];
-  for await (const chunk of stdin) chunks.push(chunk);
+  let total = 0;
+  for await (const chunk of stdin) {
+    total += chunk.length;
+    // Check before buffering the chunk so a runaway pipe fails fast instead
+    // of accumulating unbounded memory on its way to the same rejection
+    // `encode()` would eventually throw anyway.
+    if (total > MAX_DOC_BYTES) {
+      throw new JotviewError(
+        "too-large",
+        `document is at least ${total} bytes; the limit is ${MAX_DOC_BYTES}`,
+      );
+    }
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks).toString("utf8");
 }
 
@@ -106,11 +135,11 @@ async function readInput(opts, io) {
  */
 function applySideEffects(url, opts, io) {
   if (opts.copy) {
-    const result = copyText(url, io.spawnImpl ? { spawnImpl: io.spawnImpl } : {});
+    const result = copyText(url, { spawnImpl: io.spawnImpl });
     if (!result.ok) io.stderr(`note: could not copy (${result.reason}).\n`);
   }
   if (opts.open) {
-    const result = openUrl(url, io.spawnImpl ? { spawnImpl: io.spawnImpl } : {});
+    const result = openUrl(url, { spawnImpl: io.spawnImpl });
     if (!result.ok) io.stderr(`note: could not open a browser (${result.reason}).\n`);
   }
 }
@@ -148,10 +177,13 @@ export async function run(argv, io) {
     const rawUrl = `${opts.baseUrl}/d#${encode(md)}`;
 
     if (!shouldShorten(rawUrl, opts)) {
-      if (opts.short) {
-        // --short was asked for but the host is not shortenable.
-        io.stderr(`jotview: --short only works with ${DEFAULT_BASE_URL}\n`);
-        return 2;
+      // Over the threshold, but the host isn't the shortenable default —
+      // don't nag about it on documents that were never going to need it.
+      if (opts.baseUrl !== DEFAULT_BASE_URL && rawUrl.length > SHORTEN_THRESHOLD) {
+        io.stderr(
+          `note: shortening skipped — only ${DEFAULT_BASE_URL} links can be ` +
+            "shortened. using the full link.\n",
+        );
       }
       io.stdout(`${rawUrl}\n`);
       applySideEffects(rawUrl, opts, io);
@@ -167,7 +199,10 @@ export async function run(argv, io) {
           `${printed.length} chars). use --raw to keep it local.\n`,
       );
     } else {
-      io.stderr(`note: could not shorten (${result.reason}); using the full link.\n`);
+      io.stderr(
+        `note: upload to the shortener failed (${result.reason}); using the full ` +
+          `link. the document may still have reached ${SHORTENER_HOST}.\n`,
+      );
     }
     io.stdout(`${printed}\n`);
     applySideEffects(printed, opts, io);
