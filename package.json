@@ -6,7 +6,7 @@
   "bin": { "jotview": "bin/jotview.js" },
   "files": ["bin", "src", "vectors.json", "README.md"],
   "engines": { "node": ">=18" },
-  "scripts": { "test": "node --test test/*.test.js" },
+  "scripts": { "test": "node --test" },
   "keywords": ["markdown", "jotbins", "cli", "share"],
   "license": "MIT"
 }
