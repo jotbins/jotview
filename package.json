@@ -8,5 +8,8 @@
   "engines": { "node": ">=18" },
   "scripts": { "test": "node --test" },
   "keywords": ["markdown", "jotbins", "cli", "share"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/jotbins/jotview.git" },
+  "homepage": "https://github.com/jotbins/jotview#readme",
+  "bugs": { "url": "https://github.com/jotbins/jotview/issues" }
 }
