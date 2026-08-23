@@ -1,0 +1,12 @@
+{
+  "name": "jotview",
+  "version": "0.1.0",
+  "description": "Turn a markdown file into a jotbins /d link. Zero dependencies.",
+  "type": "module",
+  "bin": { "jotview": "bin/jotview.js" },
+  "files": ["bin", "src", "vectors.json", "README.md"],
+  "engines": { "node": ">=18" },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "keywords": ["markdown", "jotbins", "cli", "share"],
+  "license": "MIT"
+}

@@ -1,0 +1,10 @@
+{
+  "note": "Shared with jotbins (src/lib/fragmentDoc.ts). Each entry pins a payload and the markdown it must decode to. Assert DECODE, not encode: DEFLATE is not canonical, so two conforming encoders may emit different valid byte streams for the same input.",
+  "vectors": [
+    { "name": "empty", "markdown": "", "payload": "z:AwA" },
+    { "name": "ascii", "markdown": "# Hello\n", "payload": "z:U1bwSM3JyecCAA" },
+    { "name": "unicode", "markdown": "# 日本語 — café 🎉\n", "payload": "z:ARsA5P8jIOaXpeacrOiqniDigJQgY2Fmw6kg8J-OiQo" },
+    { "name": "mermaid-fence", "markdown": "```mermaid\ngraph TD;\nA-->B;\n```\n", "payload": "z:S0hIyE0tyk3MTOFKL0osyFAIcbHmctTVtXOy5kpISOACAA" },
+    { "name": "multiline", "markdown": "# Title\n\nPara one.\n\n- a\n- b\n", "payload": "z:U1YIySzJSeXiCkgsSlTIz0vV4-LSVUjk0lVI4gIA" }
+  ]
+}
