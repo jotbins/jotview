@@ -102,15 +102,15 @@ async function readInput(opts, io) {
  * stdout, so a missing `xclip` is a warning, not a failure.
  * @param {string} url
  * @param {Options} opts
- * @param {{stderr: (s: string) => void}} io
+ * @param {{stderr: (s: string) => void, spawnImpl?: Function}} io
  */
 function applySideEffects(url, opts, io) {
   if (opts.copy) {
-    const result = copyText(url);
+    const result = copyText(url, io.spawnImpl ? { spawnImpl: io.spawnImpl } : {});
     if (!result.ok) io.stderr(`note: could not copy (${result.reason}).\n`);
   }
   if (opts.open) {
-    const result = openUrl(url);
+    const result = openUrl(url, io.spawnImpl ? { spawnImpl: io.spawnImpl } : {});
     if (!result.ok) io.stderr(`note: could not open a browser (${result.reason}).\n`);
   }
 }
@@ -119,7 +119,11 @@ function applySideEffects(url, opts, io) {
  * @param {string[]} argv
  * @param {{stdout: (s: string) => void, stderr: (s: string) => void,
  *          stdin: import("node:stream").Readable, isTTY: boolean,
- *          version: string}} io
+ *          version: string, spawnImpl?: Function}} io
+ *   `spawnImpl` is optional and test-only — it is threaded down to
+ *   `openUrl`/`copyText` so tests can assert on the command that would have
+ *   been spawned without touching a real browser or clipboard. `bin/jotview.js`
+ *   never sets it, so real usage is unaffected.
  * @returns {Promise<number>} exit code
  */
 export async function run(argv, io) {

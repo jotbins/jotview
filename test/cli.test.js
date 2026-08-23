@@ -175,11 +175,74 @@ test("upload disclosure: a shortened document warns on stderr with both lengths"
   }
 });
 
-test("--copy never affects the exit code or stdout", async () => {
-  const p = fixture("copy.md", "# Copy\n");
-  // Whether the clipboard helper exists varies by machine and CI image. Either
-  // way the contract holds: exit 0, and stdout is still just the URL.
-  const { code, stdout } = await runCli([p, "--raw", "--copy"]);
+test("--copy receives the short URL, not the long one, after a successful shorten", async () => {
+  // Varied text, not a repeated string — same reasoning as the upload
+  // disclosure test: repetition compresses under the shorten threshold and
+  // would silently skip the branch under test.
+  const md = "# Big\n\n" + Array.from(
+    { length: 2000 },
+    (_, i) => `## Section ${i} with unique text ${i}\n`,
+  ).join("");
+  const p = fixture("copy-short.md", md);
+
+  const rawUrl = `${DEFAULT_BASE_URL}/d#${encode(md)}`;
+  assert.ok(rawUrl.length > 2000, `expected rawUrl over 2000 chars, got ${rawUrl.length}`);
+
+  const shortUrl = "https://surl.jotbins.com/xyz789";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ short_url: shortUrl }),
+  });
+
+  // Recording fake stands in for spawnSync — no real clipboard command runs.
+  const calls = [];
+  const spawnImpl = (cmd, args, options) => {
+    calls.push({ cmd, args, options });
+    return { status: 0 };
+  };
+
+  let stdout = "";
+  try {
+    const code = await run([p, "--copy"], {
+      stdout: (s) => { stdout += s; },
+      stderr: () => {},
+      stdin: process.stdin,
+      isTTY: false,
+      version: "0.1.0",
+      spawnImpl,
+    });
+
+    assert.equal(code, 0);
+    assert.equal(calls.length, 1);
+    // The text handed to the clipboard command is the short URL, never the
+    // long one — this is the property that Task 4's `printed` variable exists
+    // to guarantee.
+    assert.equal(calls[0].options.input, shortUrl);
+    assert.notEqual(calls[0].options.input, rawUrl);
+    assert.equal(stdout, `${shortUrl}\n`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("--copy is best-effort: a failing clipboard command still exits 0 and warns on stderr", async () => {
+  const p = fixture("copy-fail.md", "# Copy fail\n");
+  const spawnImpl = () => ({ status: 1 });
+
+  let stdout = "";
+  let stderr = "";
+  const code = await run([p, "--raw", "--copy"], {
+    stdout: (s) => { stdout += s; },
+    stderr: (s) => { stderr += s; },
+    stdin: process.stdin,
+    isTTY: false,
+    version: "0.1.0",
+    spawnImpl,
+  });
+
   assert.equal(code, 0);
   assert.match(stdout.trim(), /^https:\/\/jotbins\.com\/d#z:[A-Za-z0-9\-_]+$/);
+  assert.match(stderr, /could not copy/);
 });
