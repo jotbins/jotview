@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { encode, JotviewError } from "./codec.js";
-
-export const DEFAULT_BASE_URL = "https://jotbins.com";
+import { shorten, shouldShorten, DEFAULT_BASE_URL } from "./shorten.js";
+export { DEFAULT_BASE_URL };
 
 export const HELP = `jotview — turn markdown into a jotbins /d link
 
@@ -122,8 +122,29 @@ export async function run(argv, io) {
   try {
     const md = await readInput(opts, io);
     if (md.trim() === "") throw new JotviewError("empty", "input is empty");
-    const url = `${opts.baseUrl}/d#${encode(md)}`;
-    io.stdout(`${url}\n`);
+    const rawUrl = `${opts.baseUrl}/d#${encode(md)}`;
+
+    if (!shouldShorten(rawUrl, opts)) {
+      if (opts.short) {
+        // --short was asked for but the host is not shortenable.
+        io.stderr(`jotview: --short only works with ${DEFAULT_BASE_URL}\n`);
+        return 2;
+      }
+      io.stdout(`${rawUrl}\n`);
+      return 0;
+    }
+
+    const result = await shorten(rawUrl);
+    if (result.ok) {
+      io.stderr(
+        `note: uploaded to jotbins to shorten (${rawUrl.length} → ` +
+          `${result.short.length} chars). use --raw to keep it local.\n`,
+      );
+      io.stdout(`${result.short}\n`);
+    } else {
+      io.stderr(`note: could not shorten (${result.reason}); using the full link.\n`);
+      io.stdout(`${rawUrl}\n`);
+    }
     return 0;
   } catch (err) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n`);

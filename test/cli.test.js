@@ -105,3 +105,26 @@ test("oversized input exits 1 and names the size", async () => {
   assert.equal(stdout, "");
   assert.match(stderr, /1000001|limit/);
 });
+
+test("a small document is not shortened and stays local", async () => {
+  const p = fixture("small.md", "# Small\n");
+  const { code, stdout, stderr } = await runCli([p]);
+  assert.equal(code, 0);
+  assert.match(stdout.trim(), /^https:\/\/jotbins\.com\/d#z:/);
+  assert.doesNotMatch(stderr, /uploaded/);
+});
+
+test("--short with a custom base URL is a usage error", async () => {
+  const p = fixture("custom.md", "# Custom\n");
+  const { code, stderr } = await runCli([p, "--base-url", "http://localhost:5173", "--short"]);
+  assert.equal(code, 2);
+  assert.match(stderr, /--short/);
+});
+
+test("a large document with a custom base URL emits the raw link, no upload", async () => {
+  const p = fixture("large-custom.md", "# Big\n\n" + "unique words here ".repeat(4000));
+  const { code, stdout, stderr } = await runCli([p, "--base-url", "http://localhost:5173"]);
+  assert.equal(code, 0);
+  assert.match(stdout.trim(), /^http:\/\/localhost:5173\/d#z:/);
+  assert.doesNotMatch(stderr, /uploaded/);
+});
