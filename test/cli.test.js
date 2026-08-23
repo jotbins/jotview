@@ -5,6 +5,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { run, DEFAULT_BASE_URL } from "../src/cli.js";
+import { encode } from "../src/codec.js";
 
 const execFileAsync = promisify(execFile);
 const BIN = new URL("../bin/jotview.js", import.meta.url).pathname;
@@ -127,4 +129,48 @@ test("a large document with a custom base URL emits the raw link, no upload", as
   assert.equal(code, 0);
   assert.match(stdout.trim(), /^http:\/\/localhost:5173\/d#z:/);
   assert.doesNotMatch(stderr, /uploaded/);
+});
+
+test("upload disclosure: a shortened document warns on stderr with both lengths", async () => {
+  // Varied text, not a repeated string — deflate crushes repetition, and a
+  // repeated filler would compress down to a URL under the threshold and
+  // silently take the "not shortened" branch instead of the one under test.
+  const md = "# Big\n\n" + Array.from(
+    { length: 2000 },
+    (_, i) => `## Section ${i} with unique text ${i}\n`,
+  ).join("");
+  const p = fixture("upload.md", md);
+
+  const rawUrl = `${DEFAULT_BASE_URL}/d#${encode(md)}`;
+  assert.ok(rawUrl.length > 2000, `expected rawUrl over 2000 chars, got ${rawUrl.length}`);
+
+  const shortUrl = "https://surl.jotbins.com/abc123";
+  const originalFetch = globalThis.fetch;
+  // Stub fetch for the duration of this test only — no network call is ever
+  // made; the shortener response is fabricated locally and restored below.
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ short_url: shortUrl }),
+  });
+
+  let stdout = "";
+  let stderr = "";
+  try {
+    const code = await run([p], {
+      stdout: (s) => { stdout += s; },
+      stderr: (s) => { stderr += s; },
+      stdin: process.stdin,
+      isTTY: false,
+      version: "0.1.0",
+    });
+
+    assert.equal(code, 0);
+    assert.equal(stdout, `${shortUrl}\n`);
+    assert.match(stderr, /uploaded to jotbins to shorten/);
+    assert.match(stderr, new RegExp(String(rawUrl.length)));
+    assert.match(stderr, new RegExp(String(shortUrl.length)));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
