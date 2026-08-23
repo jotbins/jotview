@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { encode, JotviewError } from "./codec.js";
 import { shorten, shouldShorten, DEFAULT_BASE_URL } from "./shorten.js";
+import { openUrl, copyText } from "./platform.js";
 export { DEFAULT_BASE_URL };
 
 export const HELP = `jotview — turn markdown into a jotbins /d link
@@ -97,6 +98,24 @@ async function readInput(opts, io) {
 }
 
 /**
+ * Side effects that must never change the exit code — the URL is already on
+ * stdout, so a missing `xclip` is a warning, not a failure.
+ * @param {string} url
+ * @param {Options} opts
+ * @param {{stderr: (s: string) => void}} io
+ */
+function applySideEffects(url, opts, io) {
+  if (opts.copy) {
+    const result = copyText(url);
+    if (!result.ok) io.stderr(`note: could not copy (${result.reason}).\n`);
+  }
+  if (opts.open) {
+    const result = openUrl(url);
+    if (!result.ok) io.stderr(`note: could not open a browser (${result.reason}).\n`);
+  }
+}
+
+/**
  * @param {string[]} argv
  * @param {{stdout: (s: string) => void, stderr: (s: string) => void,
  *          stdin: import("node:stream").Readable, isTTY: boolean,
@@ -131,20 +150,23 @@ export async function run(argv, io) {
         return 2;
       }
       io.stdout(`${rawUrl}\n`);
+      applySideEffects(rawUrl, opts, io);
       return 0;
     }
 
     const result = await shorten(rawUrl);
+    let printed = rawUrl;
     if (result.ok) {
+      printed = result.short;
       io.stderr(
         `note: uploaded to jotbins to shorten (${rawUrl.length} → ` +
-          `${result.short.length} chars). use --raw to keep it local.\n`,
+          `${printed.length} chars). use --raw to keep it local.\n`,
       );
-      io.stdout(`${result.short}\n`);
     } else {
       io.stderr(`note: could not shorten (${result.reason}); using the full link.\n`);
-      io.stdout(`${rawUrl}\n`);
     }
+    io.stdout(`${printed}\n`);
+    applySideEffects(printed, opts, io);
     return 0;
   } catch (err) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n`);

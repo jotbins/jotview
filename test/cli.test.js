@@ -174,3 +174,12 @@ test("upload disclosure: a shortened document warns on stderr with both lengths"
     globalThis.fetch = originalFetch;
   }
 });
+
+test("--copy never affects the exit code or stdout", async () => {
+  const p = fixture("copy.md", "# Copy\n");
+  // Whether the clipboard helper exists varies by machine and CI image. Either
+  // way the contract holds: exit 0, and stdout is still just the URL.
+  const { code, stdout } = await runCli([p, "--raw", "--copy"]);
+  assert.equal(code, 0);
+  assert.match(stdout.trim(), /^https:\/\/jotbins\.com\/d#z:[A-Za-z0-9\-_]+$/);
+});
