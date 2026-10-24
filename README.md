@@ -21,6 +21,7 @@ entirely in the browser.
 ```
 jotview <file>            mint a link from a file
 jotview                   read markdown from stdin
+jotview mcp [--raw]       run as an MCP server for AI agents
 
   --raw                   never shorten; always the full /d URL
   --short                 always shorten, even when small
@@ -68,6 +69,43 @@ never expire.
 
 If the shortener is unreachable or rate-limited, jotview prints the full link
 and exits 0 — it never fails your pipeline over a shortening problem.
+
+## Use with AI agents (MCP)
+
+`jotview mcp` is a stdio [MCP](https://modelcontextprotocol.io) server with one
+tool, `render_markdown`. An AI writes markdown — notes, a report, a Mermaid
+diagram — and gets back a jotbins link to hand you.
+
+**Claude Code**
+
+```bash
+claude mcp add jotview -- npx -y jotview mcp
+```
+
+**Claude Desktop, Cursor, and other clients** — add to the MCP config:
+
+```json
+{ "mcpServers": { "jotview": { "command": "npx", "args": ["-y", "jotview", "mcp"] } } }
+```
+
+Then just ask: *"draw a diagram of our deploy flow and give me a jotbins link."*
+
+**The tool** takes `content` (the markdown), plus optional `keep` (make a
+short link permanent) and `shorten` (`"auto"`, `"always"` or `"never"`). It
+returns a ready-made markdown link, `[First heading](url)`, and a note on
+whether anything was uploaded. It never reads files — the AI passes text it
+already has.
+
+**Uploads.** Every character of a link costs tokens, so MCP shortens sooner
+than the CLI: links over **500** characters go through `surl.jotbins.com`,
+which uploads the document (short links expire after 30 days unused unless
+`keep` is set). To forbid uploads entirely, start the server with `--raw`:
+
+```bash
+claude mcp add jotview -- npx -y jotview mcp --raw
+```
+
+Works with clients on any MCP revision from `2024-11-05` through `2026-07-28`.
 
 ## Output contract
 

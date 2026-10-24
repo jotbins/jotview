@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
-import { encode, JotviewError, MAX_DOC_BYTES } from "./codec.js";
-import {
-  shorten, shouldShorten, DEFAULT_BASE_URL, SHORTEN_THRESHOLD, SHORTENER_URL,
-} from "./shorten.js";
+import { JotviewError, MAX_DOC_BYTES } from "./codec.js";
+import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
+import { mint } from "./mint.js";
+import { serve } from "./mcp-stdio.js";
+import { renderTool } from "./mcp-tool.js";
 import { openUrl, copyText } from "./platform.js";
 export { DEFAULT_BASE_URL };
 
@@ -15,6 +16,8 @@ export const HELP = `jotview — turn markdown into a jotbins /d link
 Usage:
   jotview <file>            mint a link from a file
   jotview                   read markdown from stdin
+  jotview mcp [--raw]       run as an MCP server (stdio) for AI agents;
+                            --raw never uploads, --base-url works too
 
 Options:
   --raw                     never shorten; always the full /d URL
@@ -98,6 +101,30 @@ export function parseArgs(argv) {
   return opts;
 }
 
+/**
+ * Flags after `jotview mcp`. Only the ones that mean something to a server.
+ * @param {string[]} argv
+ * @returns {{raw: boolean, baseUrl: string}}
+ */
+export function parseMcpArgs(argv) {
+  const opts = { raw: false, baseUrl: DEFAULT_BASE_URL };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--raw") {
+      opts.raw = true;
+    } else if (arg === "--base-url") {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith("-") || !/^https?:\/\//.test(value)) {
+        throw new JotviewError("usage", "--base-url needs an absolute http:// or https:// URL");
+      }
+      opts.baseUrl = value.replace(/\/+$/, "");
+    } else {
+      throw new JotviewError("usage", `jotview mcp does not take ${arg}`);
+    }
+  }
+  return opts;
+}
+
 /** @param {import("node:stream").Readable} stdin */
 async function readStdin(stdin) {
   /** @type {Buffer[]} */
@@ -165,6 +192,8 @@ function applySideEffects(url, opts, io) {
  * @returns {Promise<number>} exit code
  */
 export async function run(argv, io) {
+  if (argv[0] === "mcp") return runMcp(argv.slice(1), io);
+
   /** @type {Options} */
   let opts;
   try {
@@ -182,29 +211,23 @@ export async function run(argv, io) {
 
   try {
     const md = await readInput(opts, io);
-    if (md.trim() === "") throw new JotviewError("empty", "input is empty");
-    const rawUrl = `${opts.baseUrl}/d#${encode(md)}`;
+    const minted = await mint(md, {
+      baseUrl: opts.baseUrl,
+      shorten: opts.raw ? "never" : opts.short ? "always" : "auto",
+      keep: opts.keep,
+    });
+    const printed = minted.url;
 
-    if (!shouldShorten(rawUrl, opts)) {
-      // Over the threshold, but the host isn't the shortenable default —
-      // don't nag about it on documents that were never going to need it.
-      if (opts.baseUrl !== DEFAULT_BASE_URL && rawUrl.length > SHORTEN_THRESHOLD) {
-        io.stderr(
-          `note: shortening skipped — only ${DEFAULT_BASE_URL} links can be ` +
-            "shortened. using the full link.\n",
-        );
-      }
-      io.stdout(`${rawUrl}\n`);
-      applySideEffects(rawUrl, opts, io);
-      return 0;
-    }
-
-    const result = await shorten(rawUrl, { permanent: opts.keep });
-    let printed = rawUrl;
-    if (result.ok) {
-      printed = result.short;
+    if (minted.skipped === "custom-base") {
+      // Only reported when the link was over the threshold — documents that
+      // were never going to need shortening don't get nagged about it.
       io.stderr(
-        `note: uploaded to jotbins to shorten (${rawUrl.length} → ` +
+        `note: shortening skipped — only ${DEFAULT_BASE_URL} links can be ` +
+          "shortened. using the full link.\n",
+      );
+    } else if (minted.shortened) {
+      io.stderr(
+        `note: uploaded to jotbins to shorten (${minted.rawUrl.length} → ` +
           `${printed.length} chars). use --raw to keep it local.\n`,
       );
       io.stderr(
@@ -212,9 +235,9 @@ export async function run(argv, io) {
           ? "note: short link kept forever.\n"
           : "note: short link expires after 30 days unused. use --keep to keep it forever.\n",
       );
-    } else {
+    } else if (minted.failure) {
       io.stderr(
-        `note: upload to the shortener failed (${result.reason}); using the full ` +
+        `note: upload to the shortener failed (${minted.failure}); using the full ` +
           `link. the document may still have reached ${SHORTENER_HOST}.\n`,
       );
     }
@@ -225,4 +248,30 @@ export async function run(argv, io) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n`);
     return 1;
   }
+}
+
+/**
+ * `jotview mcp`: stdout belongs to the protocol from here on, so usage
+ * errors go to stderr and nothing else is ever printed.
+ * @param {string[]} argv
+ * @param {Parameters<typeof run>[1]} io
+ * @returns {Promise<number>}
+ */
+async function runMcp(argv, io) {
+  let opts;
+  try {
+    opts = parseMcpArgs(argv);
+  } catch (err) {
+    io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n\n${HELP}`);
+    return 2;
+  }
+  await serve({
+    input: io.stdin,
+    write: io.stdout,
+    ctx: {
+      version: io.version,
+      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl })],
+    },
+  });
+  return 0;
 }
