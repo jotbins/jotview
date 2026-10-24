@@ -1,15 +1,36 @@
 {
   "name": "jotview",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Turn a markdown file into a jotbins /d link. Zero dependencies.",
   "type": "module",
-  "bin": { "jotview": "bin/jotview.js" },
-  "files": ["bin", "src", "vectors.json", "README.md"],
-  "engines": { "node": ">=18" },
-  "scripts": { "test": "node --test" },
-  "keywords": ["markdown", "jotbins", "cli", "share"],
+  "bin": {
+    "jotview": "bin/jotview.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "vectors.json",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "markdown",
+    "jotbins",
+    "cli",
+    "share"
+  ],
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/jotbins/jotview.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jotbins/jotview.git"
+  },
   "homepage": "https://github.com/jotbins/jotview#readme",
-  "bugs": { "url": "https://github.com/jotbins/jotview/issues" }
+  "bugs": {
+    "url": "https://github.com/jotbins/jotview/issues"
+  }
 }
