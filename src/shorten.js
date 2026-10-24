@@ -28,7 +28,9 @@ export function shouldShorten(url, opts) {
 /**
  * Shorten a URL. Never throws — the caller falls back to the raw URL.
  * @param {string} url
- * @param {{endpoint?: string}} [options]
+ * @param {{endpoint?: string, permanent?: boolean}} [options]
+ *   `permanent` asks surl for a link that never expires. Left out of the body
+ *   when false, so the request matches what older surl versions expect.
  * @returns {Promise<{ok: true, short: string} | {ok: false, reason: string}>}
  */
 export async function shorten(url, options = {}) {
@@ -37,7 +39,7 @@ export async function shorten(url, options = {}) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(options.permanent ? { url, permanent: true } : { url }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) {

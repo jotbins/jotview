@@ -116,3 +116,32 @@ test("shorten: posts the URL as JSON", async () => {
   });
   assert.deepEqual(seen, { url: long });
 });
+
+/** Stub shortener that records the JSON body it received. */
+function recordingHandler(seen) {
+  return (req, res) => {
+    let raw = "";
+    req.on("data", (c) => { raw += c; });
+    req.on("end", () => {
+      seen.body = JSON.parse(raw);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ short_url: "https://surl.jotbins.com/abc123" }));
+    });
+  };
+}
+
+test("shorten: permanent sends permanent: true", async () => {
+  const seen = {};
+  await withServer(recordingHandler(seen), async (endpoint) => {
+    await shorten(long, { endpoint, permanent: true });
+  });
+  assert.deepEqual(seen.body, { url: long, permanent: true });
+});
+
+test("shorten: without permanent the body has no permanent key", async () => {
+  const seen = {};
+  await withServer(recordingHandler(seen), async (endpoint) => {
+    await shorten(long, { endpoint });
+  });
+  assert.deepEqual(seen.body, { url: long });
+});

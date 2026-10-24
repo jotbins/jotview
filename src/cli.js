@@ -19,6 +19,7 @@ Usage:
 Options:
   --raw                     never shorten; always the full /d URL
   --short                   always shorten, even when small
+  --keep                    make a shortened link permanent
   --open                    open the link in your browser
   --copy                    copy the link to your clipboard
   --base-url <url>          override ${DEFAULT_BASE_URL}
@@ -28,6 +29,9 @@ Options:
 Links 2000 characters or fewer are printed as-is and never leave your machine.
 Longer ones are shortened via surl.jotbins.com, which uploads the document.
 Use --raw to keep it local regardless of size.
+
+Short links are deleted after 30 days unused, unless made with --keep or
+saved from the link's waiting page. Full /d links never expire.
 `;
 
 /**
@@ -35,6 +39,7 @@ Use --raw to keep it local regardless of size.
  * @property {string|null} file
  * @property {boolean} raw
  * @property {boolean} short
+ * @property {boolean} keep
  * @property {boolean} open
  * @property {boolean} copy
  * @property {string} baseUrl
@@ -49,7 +54,7 @@ Use --raw to keep it local regardless of size.
 export function parseArgs(argv) {
   /** @type {Options} */
   const opts = {
-    file: null, raw: false, short: false, open: false, copy: false,
+    file: null, raw: false, short: false, keep: false, open: false, copy: false,
     baseUrl: DEFAULT_BASE_URL, help: false, version: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -57,6 +62,7 @@ export function parseArgs(argv) {
     switch (arg) {
       case "--raw": opts.raw = true; break;
       case "--short": opts.short = true; break;
+      case "--keep": opts.keep = true; break;
       case "--open": opts.open = true; break;
       case "--copy": opts.copy = true; break;
       case "-h": case "--help": opts.help = true; break;
@@ -82,6 +88,9 @@ export function parseArgs(argv) {
   }
   if (opts.raw && opts.short) {
     throw new JotviewError("usage", "--raw and --short cannot be combined");
+  }
+  if (opts.raw && opts.keep) {
+    throw new JotviewError("usage", "--keep has no effect with --raw: full links never expire");
   }
   if (opts.short && opts.baseUrl !== DEFAULT_BASE_URL) {
     throw new JotviewError("usage", `--short only works with ${DEFAULT_BASE_URL}`);
@@ -190,13 +199,18 @@ export async function run(argv, io) {
       return 0;
     }
 
-    const result = await shorten(rawUrl);
+    const result = await shorten(rawUrl, { permanent: opts.keep });
     let printed = rawUrl;
     if (result.ok) {
       printed = result.short;
       io.stderr(
         `note: uploaded to jotbins to shorten (${rawUrl.length} → ` +
           `${printed.length} chars). use --raw to keep it local.\n`,
+      );
+      io.stderr(
+        opts.keep
+          ? "note: short link kept forever.\n"
+          : "note: short link expires after 30 days unused. use --keep to keep it forever.\n",
       );
     } else {
       io.stderr(

@@ -132,6 +132,19 @@ test("--raw with --short is a usage error (exit 2)", async () => {
   assert.match(stderr, /--raw/);
 });
 
+test("--keep with --raw is a usage error (exit 2)", async () => {
+  const p = fixture("keep-raw.md", "# Keep\n");
+  const { code, stderr } = await runCli([p, "--raw", "--keep"]);
+  assert.equal(code, 2);
+  assert.match(stderr, /--keep/);
+});
+
+test("--help documents --keep and the 30-day expiry", async () => {
+  const { stdout } = await runCli(["--help"]);
+  assert.match(stdout, /--keep/);
+  assert.match(stdout, /30 days/);
+});
+
 test("unknown flag is a usage error (exit 2)", async () => {
   const p = fixture("unknown.md", "# U\n");
   const { code, stderr } = await runCli([p, "--wat"]);
@@ -392,4 +405,48 @@ test("EPIPE: a downstream reader that exits early does not crash jotview", async
   });
 
   assert.equal(code, 0);
+});
+
+/** Run `run()` on a document big enough to be shortened, with fetch stubbed. */
+async function runShortened(name, extraArgs) {
+  const md = "# Big\n\n" + Array.from(
+    { length: 2000 },
+    (_, i) => `## Section ${i} with unique text ${i}\n`,
+  ).join("");
+  const p = fixture(name, md);
+  const originalFetch = globalThis.fetch;
+  /** @type {any} */
+  let sentBody;
+  globalThis.fetch = async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return { ok: true, status: 200, json: async () => ({ short_url: "https://surl.jotbins.com/abc123" }) };
+  };
+  let stderr = "";
+  try {
+    const code = await run([p, ...extraArgs], {
+      stdout: () => {},
+      stderr: (s) => { stderr += s; },
+      stdin: process.stdin,
+      isTTY: false,
+      version: "0.1.0",
+    });
+    return { code, stderr, sentBody };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test("--keep asks the shortener for a permanent link and says so", async () => {
+  const { code, stderr, sentBody } = await runShortened("keep.md", ["--keep"]);
+  assert.equal(code, 0);
+  assert.equal(sentBody.permanent, true);
+  assert.match(stderr, /kept forever/);
+});
+
+test("a shortened link without --keep warns that it expires", async () => {
+  const { code, stderr, sentBody } = await runShortened("expires.md", []);
+  assert.equal(code, 0);
+  assert.equal("permanent" in sentBody, false);
+  assert.match(stderr, /expires after 30 days unused/);
+  assert.match(stderr, /--keep/);
 });
