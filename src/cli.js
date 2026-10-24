@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { JotviewError, MAX_DOC_BYTES } from "./codec.js";
 import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
 import { mint } from "./mint.js";
+import { serve } from "./mcp-stdio.js";
+import { renderTool } from "./mcp-tool.js";
 import { openUrl, copyText } from "./platform.js";
 export { DEFAULT_BASE_URL };
 
@@ -14,6 +16,8 @@ export const HELP = `jotview — turn markdown into a jotbins /d link
 Usage:
   jotview <file>            mint a link from a file
   jotview                   read markdown from stdin
+  jotview mcp [--raw]       run as an MCP server (stdio) for AI agents;
+                            --raw never uploads, --base-url works too
 
 Options:
   --raw                     never shorten; always the full /d URL
@@ -97,6 +101,30 @@ export function parseArgs(argv) {
   return opts;
 }
 
+/**
+ * Flags after `jotview mcp`. Only the ones that mean something to a server.
+ * @param {string[]} argv
+ * @returns {{raw: boolean, baseUrl: string}}
+ */
+export function parseMcpArgs(argv) {
+  const opts = { raw: false, baseUrl: DEFAULT_BASE_URL };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--raw") {
+      opts.raw = true;
+    } else if (arg === "--base-url") {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith("-") || !/^https?:\/\//.test(value)) {
+        throw new JotviewError("usage", "--base-url needs an absolute http:// or https:// URL");
+      }
+      opts.baseUrl = value.replace(/\/+$/, "");
+    } else {
+      throw new JotviewError("usage", `jotview mcp does not take ${arg}`);
+    }
+  }
+  return opts;
+}
+
 /** @param {import("node:stream").Readable} stdin */
 async function readStdin(stdin) {
   /** @type {Buffer[]} */
@@ -164,6 +192,8 @@ function applySideEffects(url, opts, io) {
  * @returns {Promise<number>} exit code
  */
 export async function run(argv, io) {
+  if (argv[0] === "mcp") return runMcp(argv.slice(1), io);
+
   /** @type {Options} */
   let opts;
   try {
@@ -218,4 +248,30 @@ export async function run(argv, io) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n`);
     return 1;
   }
+}
+
+/**
+ * `jotview mcp`: stdout belongs to the protocol from here on, so usage
+ * errors go to stderr and nothing else is ever printed.
+ * @param {string[]} argv
+ * @param {Parameters<typeof run>[1]} io
+ * @returns {Promise<number>}
+ */
+async function runMcp(argv, io) {
+  let opts;
+  try {
+    opts = parseMcpArgs(argv);
+  } catch (err) {
+    io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n\n${HELP}`);
+    return 2;
+  }
+  await serve({
+    input: io.stdin,
+    write: io.stdout,
+    ctx: {
+      version: io.version,
+      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl })],
+    },
+  });
+  return 0;
 }
