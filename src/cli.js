@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
-import { encode, JotviewError, MAX_DOC_BYTES } from "./codec.js";
-import {
-  shorten, shouldShorten, DEFAULT_BASE_URL, SHORTEN_THRESHOLD, SHORTENER_URL,
-} from "./shorten.js";
+import { JotviewError, MAX_DOC_BYTES } from "./codec.js";
+import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
+import { mint } from "./mint.js";
 import { openUrl, copyText } from "./platform.js";
 export { DEFAULT_BASE_URL };
 
@@ -182,29 +181,23 @@ export async function run(argv, io) {
 
   try {
     const md = await readInput(opts, io);
-    if (md.trim() === "") throw new JotviewError("empty", "input is empty");
-    const rawUrl = `${opts.baseUrl}/d#${encode(md)}`;
+    const minted = await mint(md, {
+      baseUrl: opts.baseUrl,
+      shorten: opts.raw ? "never" : opts.short ? "always" : "auto",
+      keep: opts.keep,
+    });
+    const printed = minted.url;
 
-    if (!shouldShorten(rawUrl, opts)) {
-      // Over the threshold, but the host isn't the shortenable default —
-      // don't nag about it on documents that were never going to need it.
-      if (opts.baseUrl !== DEFAULT_BASE_URL && rawUrl.length > SHORTEN_THRESHOLD) {
-        io.stderr(
-          `note: shortening skipped — only ${DEFAULT_BASE_URL} links can be ` +
-            "shortened. using the full link.\n",
-        );
-      }
-      io.stdout(`${rawUrl}\n`);
-      applySideEffects(rawUrl, opts, io);
-      return 0;
-    }
-
-    const result = await shorten(rawUrl, { permanent: opts.keep });
-    let printed = rawUrl;
-    if (result.ok) {
-      printed = result.short;
+    if (minted.skipped === "custom-base") {
+      // Only reported when the link was over the threshold — documents that
+      // were never going to need shortening don't get nagged about it.
       io.stderr(
-        `note: uploaded to jotbins to shorten (${rawUrl.length} → ` +
+        `note: shortening skipped — only ${DEFAULT_BASE_URL} links can be ` +
+          "shortened. using the full link.\n",
+      );
+    } else if (minted.shortened) {
+      io.stderr(
+        `note: uploaded to jotbins to shorten (${minted.rawUrl.length} → ` +
           `${printed.length} chars). use --raw to keep it local.\n`,
       );
       io.stderr(
@@ -212,9 +205,9 @@ export async function run(argv, io) {
           ? "note: short link kept forever.\n"
           : "note: short link expires after 30 days unused. use --keep to keep it forever.\n",
       );
-    } else {
+    } else if (minted.failure) {
       io.stderr(
-        `note: upload to the shortener failed (${result.reason}); using the full ` +
+        `note: upload to the shortener failed (${minted.failure}); using the full ` +
           `link. the document may still have reached ${SHORTENER_HOST}.\n`,
       );
     }
