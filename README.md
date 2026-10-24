@@ -24,6 +24,7 @@ jotview                   read markdown from stdin
 
   --raw                   never shorten; always the full /d URL
   --short                 always shorten, even when small
+  --keep                  make a shortened link permanent
   --open                  open the link in your browser
   --copy                  copy the link to your clipboard
   --base-url <url>        override https://jotbins.com
@@ -51,12 +52,19 @@ jotview tells you on stderr when that happens:
 
 ```
 note: uploaded to jotbins to shorten (8768 → 30 chars). use --raw to keep it local.
+note: short link expires after 30 days unused. use --keep to keep it forever.
 ```
 
 **Shortening uploads your document.** The fragment *is* the markdown, so storing
 the URL stores the text. Below the threshold nothing is uploaded and no network
 request is made at all. Use `--raw` to keep a long document local, accepting a
 URL too long to paste into most places.
+
+**Short links clean up after themselves.** One nobody opens for 30 days is
+deleted, with a 60-day window to bring it back from its waiting page. Pass
+`--keep` to make it permanent from the start, or click **Save link** on the
+waiting page any time before then. Full `/d` links are never stored, so they
+never expire.
 
 If the shortener is unreachable or rate-limited, jotview prints the full link
 and exits 0 — it never fails your pipeline over a shortening problem.
