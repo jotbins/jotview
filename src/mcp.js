@@ -12,7 +12,8 @@ export const LEGACY_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-
 export const MODERN_VERSIONS = ["2026-07-28"];
 
 export const INSTRUCTIONS =
-  "Use render_markdown to share markdown — including Mermaid diagrams — as a " +
+  "Use render_markdown to share markdown — including Mermaid diagrams, $…$ " +
+  "math and > [!NOTE] / [!TIP] / [!WARNING] callouts — as a " +
   "rendered jotbins page. Show the returned link to the user as a markdown " +
   "link, [title](url); never paste a bare jotbins.com/d URL, it can be " +
   "thousands of characters. Long documents are uploaded to shorten the link " +
