@@ -154,6 +154,9 @@ you still get the full link.
 The Worker lives in [`worker/`](worker/) and deploys with
 `cd worker && npx wrangler deploy`.
 
+If a release run fails partway, fix the cause and finish it with
+`gh workflow run release.yml -f tag=vX.Y.Z` — finished steps are skipped.
+
 ## Output contract
 
 **stdout is the URL and nothing else.** Notices, warnings, and errors go to
@@ -192,6 +195,9 @@ then tests, publishes to npm (trusted publishing, with provenance), attaches
 `jotview.mcpb` to a GitHub release, and updates the MCP Registry entry. Move
 the `Unreleased` notes in `CHANGELOG.md` under the new version first (commit that before `npm version`). The
 Worker deploys separately: `cd worker && npx wrangler deploy`.
+
+If a release run fails partway, fix the cause and finish it with
+`gh workflow run release.yml -f tag=vX.Y.Z` — finished steps are skipped.
 
 ## License
 
