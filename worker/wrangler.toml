@@ -1,0 +1,24 @@
+name = "jotview-mcp"
+main = "index.js"
+compatibility_date = "2026-08-23"
+# node:zlib (deflateRawSync) and Buffer for src/codec.js.
+compatibility_flags = ["nodejs_compat"]
+
+[[routes]]
+pattern = "mcp.jotbins.com"
+custom_domain = true
+
+# Uploads reach surl Worker-to-Worker, skipping its zone rate limit.
+[[services]]
+binding = "SURL"
+service = "url-shortener"
+
+# Per-client-IP limit on uploads to surl. Over it, tools still answer with
+# the full /d link.
+[[ratelimits]]
+name = "UPLOADS"
+namespace_id = "2001"
+simple = { limit = 30, period = 60 }
+
+[observability]
+enabled = true
