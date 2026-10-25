@@ -1,6 +1,6 @@
 {
   "name": "jotview",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Turn markdown into a jotbins /d link — a CLI and an MCP server. Zero dependencies.",
   "type": "module",
   "bin": {
