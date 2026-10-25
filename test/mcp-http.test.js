@@ -89,6 +89,15 @@ test("GET / explains how to connect", async () => {
   assert.match(await res.text(), /https:\/\/mcp\.jotbins\.com\/mcp/);
 });
 
+test("GET / teaches setup for each major client", async () => {
+  const text = await (await handleHttp(new Request(`${BASE}/`), ctx)).text();
+  for (const client of ["claude.ai", "Claude Desktop", "Claude Code", "Cursor", "VS Code", "Windsurf", "Gemini CLI", "npx -y jotview mcp"]) {
+    assert.ok(text.includes(client), client);
+  }
+  assert.match(text, /30 days/);
+  assert.ok(text.split("\n").every((l) => l.length <= 80), "lines fit 80 columns");
+});
+
 test("anything else is a 404", async () => {
   const res = await handleHttp(new Request(`${BASE}/nope`), ctx);
   assert.equal(res.status, 404);
