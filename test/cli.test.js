@@ -450,3 +450,31 @@ test("a shortened link without --keep warns that it expires", async () => {
   assert.match(stderr, /expires after 30 days unused/);
   assert.match(stderr, /--keep/);
 });
+
+test("decode prints a /d link's markdown exactly, exit 0", async () => {
+  const md = "# Round trip\n\nno trailing newline";
+  const { code, stdout, stderr } = await runCli(["decode", `${DEFAULT_BASE_URL}/d#${encode(md)}`]);
+  assert.equal(code, 0);
+  assert.equal(stdout, md);
+  assert.equal(stderr, "");
+});
+
+test("decode of a non-jotbins link: stderr, exit 1", async () => {
+  const { code, stdout, stderr } = await runCli(["decode", "https://example.com/d#z:AwA"]);
+  assert.equal(code, 1);
+  assert.equal(stdout, "");
+  assert.match(stderr, /only jotbins\.com\/d links/);
+});
+
+test("decode needs exactly one URL: usage, exit 2", async () => {
+  for (const args of [["decode"], ["decode", "a", "b"], ["decode", "--raw"]]) {
+    const { code, stderr } = await runCli(args);
+    assert.equal(code, 2, args.join(" "));
+    assert.match(stderr, /decode/);
+  }
+});
+
+test("help lists decode", async () => {
+  const { stdout } = await runCli(["--help"]);
+  assert.match(stdout, /jotview decode <url>/);
+});

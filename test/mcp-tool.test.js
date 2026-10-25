@@ -105,3 +105,18 @@ test("bad input is a tool error the model can fix", async () => {
   assert.equal(big.isError, true);
   assert.match(textOf(big), /limit/);
 });
+
+test("title overrides the heading as link text, escaped and capped", async () => {
+  const { t } = tool();
+  const res = await t.call({ content: "# Heading\n\nbody", title: "  My [plan]  " });
+  assert.match(textOf(res).split("\n")[0], /^\[My \\\[plan\\\]\]\(https:/);
+  const long = await t.call({ content: "# x", title: "y".repeat(200) });
+  assert.match(textOf(long).split("\n")[0], /^\[y{80}\]\(/);
+});
+
+test("title must be a non-empty string", async () => {
+  const { t } = tool();
+  for (const title of ["", "   ", 7]) {
+    assert.equal((await t.call({ content: "# x", title })).isError, true, JSON.stringify(title));
+  }
+});

@@ -36,7 +36,7 @@ test("legacy session: initialize, list, call — one JSON line per request", asy
   assert.equal(out.length, 3);
   const byId = Object.fromEntries(out.map((r) => [r.id, r]));
   assert.equal(byId[1].result.protocolVersion, "2025-06-18");
-  assert.equal(byId[2].result.tools[0].name, "render_markdown");
+  assert.deepEqual(byId[2].result.tools.map((t) => t.name), ["render_markdown", "read_link"]);
   assert.match(byId[3].result.content[0].text, /^\[Hi\]\(https:\/\/jotbins\.com\/d#z:/);
 });
 
