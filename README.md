@@ -21,6 +21,7 @@ entirely in the browser.
 ```
 jotview <file>            mint a link from a file
 jotview                   read markdown from stdin
+jotview decode <url>      print the markdown behind a /d or short link
 jotview mcp [--raw]       run as an MCP server for AI agents
 
   --raw                   never shorten; always the full /d URL
@@ -40,7 +41,12 @@ jotview README.md --open
 cat notes.md | jotview
 jotview notes.md | pbcopy
 LINK=$(jotview notes.md --raw)
+jotview decode https://surl.jotbins.com/abc123 > notes.md
 ```
+
+`decode` accepts `jotbins.com/d` links (decoded locally) and
+`surl.jotbins.com` short links (fetched; like a click, that keeps an active
+short link alive).
 
 ## Shortening, and what it costs you
 
@@ -72,9 +78,10 @@ and exits 0 — it never fails your pipeline over a shortening problem.
 
 ## Use with AI agents (MCP)
 
-`jotview mcp` is a stdio [MCP](https://modelcontextprotocol.io) server with one
-tool, `render_markdown`. An AI writes markdown — notes, a report, a Mermaid
-diagram — and gets back a jotbins link to hand you.
+`jotview mcp` is a stdio [MCP](https://modelcontextprotocol.io) server with two
+tools. With `render_markdown` an AI writes markdown — notes, a report, a
+Mermaid diagram — and gets back a jotbins link to hand you; with `read_link`
+it reads a jotbins link you share.
 
 **Claude Code**
 
@@ -90,11 +97,16 @@ claude mcp add jotview -- npx -y jotview mcp
 
 Then just ask: *"draw a diagram of our deploy flow and give me a jotbins link."*
 
-**The tool** takes `content` (the markdown), plus optional `keep` (make a
-short link permanent) and `shorten` (`"auto"`, `"always"` or `"never"`). It
-returns a ready-made markdown link, `[First heading](url)`, and a note on
-whether anything was uploaded. It never reads files — the AI passes text it
-already has.
+**`render_markdown`** takes `content` (the markdown), plus optional `title`
+(link text instead of the first heading), `keep` (make a short link
+permanent) and `shorten` (`"auto"`, `"always"` or `"never"`). It returns a
+ready-made markdown link, `[First heading](url)`, and a note on whether
+anything was uploaded. It never reads files — the AI passes text it already
+has.
+
+**`read_link`** takes a `url` (a `/d` link or a short link) and returns the
+markdown behind it, so you can paste a link and say *"fix the typos and give
+me a new link."* Links never change; an edit is a new link.
 
 **Uploads.** Every character of a link costs tokens, so MCP shortens sooner
 than the CLI: links over **500** characters go through `surl.jotbins.com`,

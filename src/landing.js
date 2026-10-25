@@ -66,8 +66,11 @@ TRY IT
 
   "Write up our deploy checklist and give me a jotbins link."
   "Draw the login flow as a Mermaid sequence diagram, as a jotbins link."
+  "Here's my jotbins link — fix the typos and give me a new one."
 
-The AI answers with a link named after the document's first heading.
+The AI answers with a link named after the document's first heading. It can
+also read any jotbins link you paste; an edit gives you a new link, the old
+one never changes.
 
 
 WHAT HAPPENS TO YOUR DOCUMENT
