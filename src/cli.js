@@ -3,6 +3,7 @@ import { JotviewError, MAX_DOC_BYTES } from "./codec.js";
 import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
 import { mint } from "./mint.js";
 import { readLink } from "./read.js";
+import { allowedRoots } from "./files.js";
 import { serve } from "./mcp-stdio.js";
 import { renderTool } from "./mcp-tool.js";
 import { readTool } from "./mcp-read-tool.js";
@@ -20,7 +21,8 @@ Usage:
   jotview                   read markdown from stdin
   jotview decode <url>      print the markdown behind a /d or short link
   jotview mcp [--raw]       run as an MCP server (stdio) for AI agents;
-                            --raw never uploads, --base-url works too
+                            --raw never uploads, --base-url works too,
+                            --allow-dir <dir> lets it read files there
 
 Options:
   --raw                     never shorten; always the full /d URL
@@ -28,6 +30,7 @@ Options:
   --keep                    make a shortened link permanent
   --open                    open the link in your browser
   --copy                    copy the link to your clipboard
+  --json                    print {url, rawUrl, shortened, permanent, failure}
   --base-url <url>          override ${DEFAULT_BASE_URL}
   -h, --help                show this help
   -v, --version             show the version
@@ -48,6 +51,7 @@ saved from the link's waiting page. Full /d links never expire.
  * @property {boolean} keep
  * @property {boolean} open
  * @property {boolean} copy
+ * @property {boolean} json
  * @property {string} baseUrl
  * @property {boolean} help
  * @property {boolean} version
@@ -60,7 +64,7 @@ saved from the link's waiting page. Full /d links never expire.
 export function parseArgs(argv) {
   /** @type {Options} */
   const opts = {
-    file: null, raw: false, short: false, keep: false, open: false, copy: false,
+    file: null, raw: false, short: false, keep: false, open: false, copy: false, json: false,
     baseUrl: DEFAULT_BASE_URL, help: false, version: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -71,6 +75,7 @@ export function parseArgs(argv) {
       case "--keep": opts.keep = true; break;
       case "--open": opts.open = true; break;
       case "--copy": opts.copy = true; break;
+      case "--json": opts.json = true; break;
       case "-h": case "--help": opts.help = true; break;
       case "-v": case "--version": opts.version = true; break;
       case "--base-url": {
@@ -110,11 +115,15 @@ export function parseArgs(argv) {
  * @returns {{raw: boolean, baseUrl: string}}
  */
 export function parseMcpArgs(argv) {
-  const opts = { raw: false, baseUrl: DEFAULT_BASE_URL };
+  const opts = { raw: false, baseUrl: DEFAULT_BASE_URL, allowDirs: /** @type {string[]} */ ([]) };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--raw") {
       opts.raw = true;
+    } else if (arg === "--allow-dir") {
+      const value = argv[++i];
+      if (value === undefined) throw new JotviewError("usage", "--allow-dir needs a folder");
+      opts.allowDirs.push(value);
     } else if (arg === "--base-url") {
       const value = argv[++i];
       if (value === undefined || value.startsWith("-") || !/^https?:\/\//.test(value)) {
@@ -245,7 +254,12 @@ export async function run(argv, io) {
           `link. the document may still have reached ${SHORTENER_HOST}.\n`,
       );
     }
-    io.stdout(`${printed}\n`);
+    if (opts.json) {
+      const { url, rawUrl, shortened, permanent, failure } = minted;
+      io.stdout(`${JSON.stringify({ url, rawUrl, shortened, permanent, failure })}\n`);
+    } else {
+      io.stdout(`${printed}\n`);
+    }
     applySideEffects(printed, opts, io);
     return 0;
   } catch (err) {
@@ -285,8 +299,10 @@ async function runDecode(argv, io) {
  */
 async function runMcp(argv, io) {
   let opts;
+  let roots;
   try {
     opts = parseMcpArgs(argv);
+    roots = allowedRoots({ cwd: process.cwd(), extra: opts.allowDirs });
   } catch (err) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n\n${HELP}`);
     return 2;
@@ -296,7 +312,7 @@ async function runMcp(argv, io) {
     write: io.stdout,
     ctx: {
       version: io.version,
-      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl }), readTool({})],
+      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl, roots }), readTool({})],
     },
   });
   return 0;

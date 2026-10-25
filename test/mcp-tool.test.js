@@ -120,3 +120,46 @@ test("title must be a non-empty string", async () => {
     assert.equal((await t.call({ content: "# x", title })).isError, true, JSON.stringify(title));
   }
 });
+
+import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const fileRoot = realpathSync(mkdtempSync(join(tmpdir(), "jotview-tool-")));
+writeFileSync(join(fileRoot, "plan.md"), "# From a file\n\nbody\n");
+writeFileSync(join(fileRoot, "untitled.md"), "no heading here\n");
+
+test("no roots: path isn't offered and content stays required", () => {
+  const { definition } = renderTool({});
+  assert.equal("path" in definition.inputSchema.properties, false);
+  assert.deepEqual(definition.inputSchema.required, ["content"]);
+});
+
+test("with roots: path is offered and content becomes optional", () => {
+  const { definition } = renderTool({ roots: [fileRoot] });
+  assert.equal(definition.inputSchema.properties.path.type, "string");
+  assert.equal(definition.inputSchema.required, undefined);
+});
+
+test("path renders the file", async () => {
+  const { t } = tool({ roots: [fileRoot] });
+  const res = await t.call({ path: "plan.md" });
+  assert.match(textOf(res).split("\n")[0], /^\[From a file\]\(https:\/\/jotbins\.com\/d#z:/);
+});
+
+test("a file with no heading is titled by its name", async () => {
+  const { t } = tool({ roots: [fileRoot] });
+  assert.match(textOf(await t.call({ path: "untitled.md" })).split("\n")[0], /^\[untitled\.md\]\(/);
+});
+
+test("path errors are tool errors; content and path are exclusive", async () => {
+  const { t } = tool({ roots: [fileRoot] });
+  for (const args of [{}, { path: "nope.md" }, { path: "/etc/hosts" }, { path: 3 }, { content: "# x", path: "plan.md" }]) {
+    assert.equal((await t.call(args)).isError, true, JSON.stringify(args));
+  }
+});
+
+test("without roots, path is rejected", async () => {
+  const { t } = tool();
+  assert.equal((await t.call({ path: "plan.md" })).isError, true);
+});

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jotbins/jotview",
+  "title": "jotview",
+  "description": "Turn markdown and Mermaid diagrams into rendered jotbins.com links, and read them back.",
+  "repository": {
+    "url": "https://github.com/jotbins/jotview",
+    "source": "github"
+  },
+  "websiteUrl": "https://mcp.jotbins.com",
+  "version": "0.4.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "jotview",
+      "version": "0.4.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.jotbins.com/mcp"
+    }
+  ]
+}

@@ -478,3 +478,21 @@ test("help lists decode", async () => {
   const { stdout } = await runCli(["--help"]);
   assert.match(stdout, /jotview decode <url>/);
 });
+
+test("--json prints one JSON line describing the link", async () => {
+  const { code, stdout } = await runCli(["--json"], { input: "# Hi\n" });
+  assert.equal(code, 0);
+  assert.equal(stdout.trim().split("\n").length, 1);
+  const out = JSON.parse(stdout);
+  assert.deepEqual(Object.keys(out), ["url", "rawUrl", "shortened", "permanent", "failure"]);
+  assert.equal(out.url, `${DEFAULT_BASE_URL}/d#${encode("# Hi\n")}`);
+  assert.equal(out.url, out.rawUrl);
+  assert.equal(out.shortened, false);
+  assert.equal(out.permanent, false);
+  assert.equal(out.failure, null);
+});
+
+test("help lists --json", async () => {
+  const { stdout } = await runCli(["--help"]);
+  assert.match(stdout, /--json/);
+});

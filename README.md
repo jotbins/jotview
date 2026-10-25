@@ -29,6 +29,7 @@ jotview mcp [--raw]       run as an MCP server for AI agents
   --keep                  make a shortened link permanent
   --open                  open the link in your browser
   --copy                  copy the link to your clipboard
+  --json                  print the result as one JSON line (see below)
   --base-url <url>        override https://jotbins.com
   -h, --help
   -v, --version
@@ -89,7 +90,11 @@ it reads a jotbins link you share.
 claude mcp add jotview -- npx -y jotview mcp
 ```
 
-**Claude Desktop, Cursor, and other clients** — add to the MCP config:
+**Claude Desktop** — download `jotview.mcpb` from the
+[latest release](https://github.com/jotbins/jotview/releases/latest) and
+double-click it. Optionally pick a docs folder it may read files from.
+
+**Cursor and other clients** — add to the MCP config:
 
 ```json
 { "mcpServers": { "jotview": { "command": "npx", "args": ["-y", "jotview", "mcp"] } } }
@@ -103,6 +108,19 @@ permanent) and `shorten` (`"auto"`, `"always"` or `"never"`). It returns a
 ready-made markdown link, `[First heading](url)`, and a note on whether
 anything was uploaded. It never reads files — the AI passes text it already
 has.
+
+**Rendering files.** The local server can also take a `path` instead of
+`content`, so the AI doesn't have to paste a whole file into the tool call.
+It reads only `.md`, `.markdown`, `.mdx` and `.txt` files, and only inside
+the folder the server runs in (Claude Code starts it in your project) or a
+folder you allow with `--allow-dir`:
+
+```bash
+claude mcp add -s user jotview -- npx -y jotview mcp --allow-dir ~/notes
+```
+
+If the server runs in `/` or your home folder and no `--allow-dir` is given,
+`path` is switched off. The remote server never reads files.
 
 **`read_link`** takes a `url` (a `/d` link or a short link) and returns the
 markdown behind it, so you can paste a link and say *"fix the typos and give
@@ -141,6 +159,15 @@ The Worker lives in [`worker/`](worker/) and deploys with
 **stdout is the URL and nothing else.** Notices, warnings, and errors go to
 stderr, so `$(jotview x.md)` and `jotview x.md | pbcopy` stay clean.
 
+With `--json`, stdout is one JSON line instead, for scripts and CI:
+
+```json
+{"url":"https://surl.jotbins.com/abc123","rawUrl":"https://jotbins.com/d#z:…","shortened":true,"permanent":false,"failure":null}
+```
+
+`failure` is the shortener's error when shortening was tried and failed
+(`url` is then the full link).
+
 Exit codes: `0` success, `1` runtime error, `2` usage error.
 
 ## Limits
@@ -150,6 +177,21 @@ Input is capped at 1 MB, matching what the `/d` renderer will open.
 ## Requirements
 
 Node 18 or newer.
+
+## Releasing
+
+Releases run from GitHub Actions. On an up-to-date `main`:
+
+```bash
+npm version minor
+git push --follow-tags
+```
+
+`npm version` also updates `manifest.json` and `server.json`. The `v*` tag
+then tests, publishes to npm (trusted publishing, with provenance), attaches
+`jotview.mcpb` to a GitHub release, and updates the MCP Registry entry. Move
+the `Unreleased` notes in `CHANGELOG.md` under the new version first (commit that before `npm version`). The
+Worker deploys separately: `cd worker && npx wrangler deploy`.
 
 ## License
 

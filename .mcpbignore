@@ -1,0 +1,13 @@
+.git/
+.github/
+.codegraph/
+.wrangler/
+test/
+worker/
+scripts/
+docs/
+node_modules/
+*.mcpb
+server.json
+.mcpbignore
+.gitignore
