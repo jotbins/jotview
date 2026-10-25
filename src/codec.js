@@ -7,7 +7,7 @@ export const PREFIX = "z:";
  *  the browser refuses to open, so reject at encode time instead. */
 export const MAX_DOC_BYTES = 1_000_000;
 
-/** @typedef {"too-large" | "empty" | "not-found" | "usage" | "read-failed" | "bad-link" | "cleaned-up"} ErrorCode */
+/** @typedef {"too-large" | "empty" | "not-found" | "usage" | "read-failed" | "bad-link" | "cleaned-up" | "not-allowed"} ErrorCode */
 
 export class JotviewError extends Error {
   /** @param {ErrorCode} code @param {string} message */
