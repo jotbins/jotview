@@ -28,6 +28,10 @@ const DEFINITION = {
         type: "boolean",
         description: "Make a shortened link permanent instead of expiring after 30 days unused.",
       },
+      title: {
+        type: "string",
+        description: "Link text to show instead of the document's first heading.",
+      },
       shorten: {
         type: "string",
         enum: MODES,
@@ -48,9 +52,11 @@ const DEFINITION = {
  */
 export function docTitle(md) {
   const match = md.match(/^#{1,6}[ \t]+(.+?)[ \t#]*$/m);
-  const title = match ? match[1].trim().slice(0, TITLE_MAX) : "jotbins doc";
-  return title.replace(/[\\[\]]/g, (c) => `\\${c}`);
+  return linkText(match ? match[1] : "jotbins doc");
 }
+
+/** @param {string} text */
+const linkText = (text) => text.trim().slice(0, TITLE_MAX).replace(/[\\[\]]/g, (c) => `\\${c}`);
 
 /** @param {string} text */
 const toolError = (text) => ({ content: [{ type: "text", text }], isError: true });
@@ -63,6 +69,9 @@ function validate(args) {
   if (typeof args.content !== "string") return "content is required: pass the markdown to render as a string.";
   if (args.content.trim() === "") return "content is empty: pass the markdown to render.";
   if (args.keep !== undefined && typeof args.keep !== "boolean") return "keep must be true or false.";
+  if (args.title !== undefined && (typeof args.title !== "string" || args.title.trim() === "")) {
+    return "title must be a non-empty string, or left out to use the first heading.";
+  }
   if (args.shorten !== undefined && !MODES.includes(/** @type {string} */ (args.shorten))) {
     return 'shorten must be "auto", "always" or "never".';
   }
@@ -129,7 +138,7 @@ export function renderTool(opts) {
       }
 
       const text =
-        `[${docTitle(md)}](${r.url})\n\n` +
+        `[${typeof args.title === "string" ? linkText(args.title) : docTitle(md)}](${r.url})\n\n` +
         `${describe(r, keep && !r.shortened)}\n` +
         "Show it to the user as the markdown link above, not as a bare URL.";
       return { content: [{ type: "text", text }] };
