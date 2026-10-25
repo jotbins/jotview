@@ -29,6 +29,7 @@ jotview mcp [--raw]       run as an MCP server for AI agents
   --keep                  make a shortened link permanent
   --open                  open the link in your browser
   --copy                  copy the link to your clipboard
+  --json                  print the result as one JSON line (see below)
   --base-url <url>        override https://jotbins.com
   -h, --help
   -v, --version
@@ -140,6 +141,15 @@ The Worker lives in [`worker/`](worker/) and deploys with
 
 **stdout is the URL and nothing else.** Notices, warnings, and errors go to
 stderr, so `$(jotview x.md)` and `jotview x.md | pbcopy` stay clean.
+
+With `--json`, stdout is one JSON line instead, for scripts and CI:
+
+```json
+{"url":"https://surl.jotbins.com/abc123","rawUrl":"https://jotbins.com/d#z:…","shortened":true,"permanent":false,"failure":null}
+```
+
+`failure` is the shortener's error when shortening was tried and failed
+(`url` is then the full link).
 
 Exit codes: `0` success, `1` runtime error, `2` usage error.
 

@@ -28,6 +28,7 @@ Options:
   --keep                    make a shortened link permanent
   --open                    open the link in your browser
   --copy                    copy the link to your clipboard
+  --json                    print {url, rawUrl, shortened, permanent, failure}
   --base-url <url>          override ${DEFAULT_BASE_URL}
   -h, --help                show this help
   -v, --version             show the version
@@ -48,6 +49,7 @@ saved from the link's waiting page. Full /d links never expire.
  * @property {boolean} keep
  * @property {boolean} open
  * @property {boolean} copy
+ * @property {boolean} json
  * @property {string} baseUrl
  * @property {boolean} help
  * @property {boolean} version
@@ -60,7 +62,7 @@ saved from the link's waiting page. Full /d links never expire.
 export function parseArgs(argv) {
   /** @type {Options} */
   const opts = {
-    file: null, raw: false, short: false, keep: false, open: false, copy: false,
+    file: null, raw: false, short: false, keep: false, open: false, copy: false, json: false,
     baseUrl: DEFAULT_BASE_URL, help: false, version: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -71,6 +73,7 @@ export function parseArgs(argv) {
       case "--keep": opts.keep = true; break;
       case "--open": opts.open = true; break;
       case "--copy": opts.copy = true; break;
+      case "--json": opts.json = true; break;
       case "-h": case "--help": opts.help = true; break;
       case "-v": case "--version": opts.version = true; break;
       case "--base-url": {
@@ -245,7 +248,12 @@ export async function run(argv, io) {
           `link. the document may still have reached ${SHORTENER_HOST}.\n`,
       );
     }
-    io.stdout(`${printed}\n`);
+    if (opts.json) {
+      const { url, rawUrl, shortened, permanent, failure } = minted;
+      io.stdout(`${JSON.stringify({ url, rawUrl, shortened, permanent, failure })}\n`);
+    } else {
+      io.stdout(`${printed}\n`);
+    }
     applySideEffects(printed, opts, io);
     return 0;
   } catch (err) {
