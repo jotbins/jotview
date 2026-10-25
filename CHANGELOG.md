@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-25
+
 ### Added
 - `render_markdown` takes a `path` instead of `content` in the local server:
   `.md`/`.markdown`/`.mdx`/`.txt` files inside the server's working folder or
@@ -52,7 +54,8 @@ Published before the `read_link` work was merged; 0.4.1 carries it.
 - Mint `jotbins.com/d` links from a file or stdin; shorten long links via
   surl.jotbins.com; `--raw`, `--short`, `--open`, `--copy`, `--base-url`.
 
-[Unreleased]: https://github.com/jotbins/jotview/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/jotbins/jotview/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jotbins/jotview/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/jotbins/jotview/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jotbins/jotview/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jotbins/jotview/compare/v0.2.0...v0.3.0

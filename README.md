@@ -190,7 +190,7 @@ git push --follow-tags
 `npm version` also updates `manifest.json` and `server.json`. The `v*` tag
 then tests, publishes to npm (trusted publishing, with provenance), attaches
 `jotview.mcpb` to a GitHub release, and updates the MCP Registry entry. Move
-the `Unreleased` notes in `CHANGELOG.md` under the new version first. The
+the `Unreleased` notes in `CHANGELOG.md` under the new version first (commit that before `npm version`). The
 Worker deploys separately: `cd worker && npx wrangler deploy`.
 
 ## License
