@@ -1,0 +1,44 @@
+name: release
+
+# Push a v* tag (`npm version minor && git push --follow-tags`) to publish.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # npm trusted publishing and MCP Registry login
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Tag matches package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+
+      - run: npm test
+
+      # Trusted publishing needs npm 11.5.1+; it signs provenance on its own.
+      - run: npm install -g npm@latest
+      - name: Publish to npm
+        run: npm publish
+
+      - name: Build the Claude Desktop bundle
+        run: npm run bundle
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" jotview.mcpb --title "$GITHUB_REF_NAME" --generate-notes
+
+      - name: Publish to the MCP Registry
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
