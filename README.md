@@ -107,6 +107,23 @@ claude mcp add jotview -- npx -y jotview mcp --raw
 
 Works with clients on any MCP revision from `2024-11-05` through `2026-07-28`.
 
+### Remote server — no install
+
+The same tool runs at **`https://mcp.jotbins.com/mcp`** (Streamable HTTP, no
+sign-in), for clients that can't run local commands.
+
+- **claude.ai (web and mobile):** Settings → Connectors → Add custom
+  connector → paste `https://mcp.jotbins.com/mcp`.
+- **Claude Code:** `claude mcp add -s user --transport http jotview https://mcp.jotbins.com/mcp`
+
+Same rules as the local server, except it can't forbid uploads: use
+`shorten: "never"` per call, or the local `--raw` server, to keep a document
+off `surl.jotbins.com`. Uploads are rate-limited per client; over the limit
+you still get the full link.
+
+The Worker lives in [`worker/`](worker/) and deploys with
+`cd worker && npx wrangler deploy`.
+
 ## Output contract
 
 **stdout is the URL and nothing else.** Notices, warnings, and errors go to

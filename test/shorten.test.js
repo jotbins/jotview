@@ -145,3 +145,15 @@ test("shorten: without permanent the body has no permanent key", async () => {
   });
   assert.deepEqual(seen.body, { url: long });
 });
+
+test("shorten: fetchImpl replaces the global fetch (Worker service binding)", async () => {
+  const calls = [];
+  const fetchImpl = async (input, init) => {
+    calls.push({ input, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ short_url: "https://surl.jotbins.com/xyz" }), { status: 200 });
+  };
+  const result = await shorten(long, { fetchImpl, permanent: true });
+  assert.deepEqual(result, { ok: true, short: "https://surl.jotbins.com/xyz" });
+  assert.equal(calls[0].input, "https://surl.jotbins.com/api/create");
+  assert.deepEqual(calls[0].body, { url: long, permanent: true });
+});
