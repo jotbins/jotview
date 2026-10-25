@@ -1,4 +1,5 @@
 import { handleMessage, parseError, LEGACY_VERSIONS, MODERN_VERSIONS } from "./mcp.js";
+import { landingText } from "./landing.js";
 
 /** Docs cap at 1 MB (MAX_DOC_BYTES); leave room for JSON escaping. */
 export const MAX_BODY_BYTES = 2_000_000;
@@ -22,18 +23,6 @@ const json = (body, status = 200) =>
 const plain = (text, status, headers = {}) =>
   new Response(text, { status, headers: { ...CORS, "content-type": "text/plain; charset=utf-8", ...headers } });
 
-/** @param {string} endpoint */
-const landing = (endpoint) => `jotview — an MCP server that turns markdown into rendered jotbins links.
-
-MCP endpoint (Streamable HTTP, no sign-in):
-  ${endpoint}
-
-claude.ai: Settings → Connectors → Add custom connector → paste the URL above.
-Claude Code: claude mcp add -s user --transport http jotview ${endpoint}
-
-Source: https://github.com/jotbins/jotview
-`;
-
 /**
  * Serve MCP over Streamable HTTP. Every request gets exactly one JSON reply —
  * no SSE stream and no sessions, since the only tool answers immediately.
@@ -48,7 +37,7 @@ export async function handleHttp(request, ctx) {
 
   if (url.pathname === "/") {
     if (request.method !== "GET") return plain("Method not allowed\n", 405, { allow: "GET" });
-    return plain(landing(`${url.origin}/mcp`), 200);
+    return plain(landingText(`${url.origin}/mcp`), 200);
   }
   if (url.pathname !== "/mcp") return plain("Not found\n", 404);
   if (request.method !== "POST") return plain("Method not allowed\n", 405, { allow: "POST, OPTIONS" });
