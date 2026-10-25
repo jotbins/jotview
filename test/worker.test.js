@@ -69,3 +69,18 @@ test("serverInfo carries the package version", async () => {
   const { version } = await import("../package.json", { with: { type: "json" } }).then((m) => m.default);
   assert.equal((await res.json()).result.serverInfo.version, version);
 });
+
+test("read_link fetches surl through the SURL binding", async () => {
+  const env = fakeEnv();
+  const target = "https://jotbins.com/d#z:U1bwSM3JyecCAA";
+  env.SURL.fetch = async (input) => {
+    env.surlCalls.push({ input: String(input) });
+    return new Response(null, { status: 302, headers: { location: target } });
+  };
+  const res = await worker.fetch(new Request("https://mcp.jotbins.com/mcp", {
+    method: "POST",
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read_link", arguments: { url: "https://surl.jotbins.com/abc123" } } }),
+  }), env);
+  assert.match((await res.json()).result.content[0].text, /^# Hello/);
+  assert.deepEqual(env.surlCalls.map((c) => c.input), ["https://surl.jotbins.com/abc123"]);
+});
