@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { JotviewError, MAX_DOC_BYTES } from "./codec.js";
 import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
 import { mint } from "./mint.js";
+import { readLink } from "./read.js";
 import { serve } from "./mcp-stdio.js";
 import { renderTool } from "./mcp-tool.js";
 import { readTool } from "./mcp-read-tool.js";
@@ -17,6 +18,7 @@ export const HELP = `jotview — turn markdown into a jotbins /d link
 Usage:
   jotview <file>            mint a link from a file
   jotview                   read markdown from stdin
+  jotview decode <url>      print the markdown behind a /d or short link
   jotview mcp [--raw]       run as an MCP server (stdio) for AI agents;
                             --raw never uploads, --base-url works too
 
@@ -194,6 +196,7 @@ function applySideEffects(url, opts, io) {
  */
 export async function run(argv, io) {
   if (argv[0] === "mcp") return runMcp(argv.slice(1), io);
+  if (argv[0] === "decode") return runDecode(argv.slice(1), io);
 
   /** @type {Options} */
   let opts;
@@ -244,6 +247,28 @@ export async function run(argv, io) {
     }
     io.stdout(`${printed}\n`);
     applySideEffects(printed, opts, io);
+    return 0;
+  } catch (err) {
+    io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n`);
+    return 1;
+  }
+}
+
+/**
+ * `jotview decode <url>`: the markdown, byte for byte, on stdout — so
+ * `jotview decode URL > doc.md` and `jotview decode URL | jotview` round-trip.
+ * @param {string[]} argv
+ * @param {Parameters<typeof run>[1]} io
+ * @returns {Promise<number>}
+ */
+async function runDecode(argv, io) {
+  if (argv.length !== 1 || argv[0].startsWith("-")) {
+    io.stderr(`jotview: decode takes exactly one link\n\n${HELP}`);
+    return 2;
+  }
+  try {
+    const { markdown } = await readLink(argv[0]);
+    io.stdout(markdown);
     return 0;
   } catch (err) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n`);
