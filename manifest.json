@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "jotview",
   "display_name": "jotview — jotbins links",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Turn markdown and Mermaid diagrams into rendered jotbins.com links, and read jotbins links back.",
   "long_description": "Ask Claude for notes, a report or a Mermaid diagram \"as a jotbins link\" and get a link that opens the page, fully rendered, on jotbins.com. Small documents live entirely inside the link; larger ones are uploaded to surl.jotbins.com for a short link (deleted after 30 days without a visit unless kept). Claude can also read any jotbins link you paste.\n\nOptionally pick a docs folder so Claude can render .md/.txt files from it without pasting them.",
   "author": {
