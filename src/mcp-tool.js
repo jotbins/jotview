@@ -17,7 +17,8 @@ const DEFINITION = {
   name: "render_markdown",
   title: "Render markdown with jotbins",
   description:
-    "Turn markdown (GitHub-flavored, with ```mermaid diagrams) into a link that " +
+    "Turn markdown (GitHub-flavored, with ```mermaid diagrams, $math$ / $$math$$, " +
+    "> [!NOTE] callouts and :emoji: shortcodes) into a link that " +
     "renders it as a page on jotbins.com. Returns a ready-made markdown link to " +
     "show the user. Small documents live entirely in the link; larger ones are " +
     "uploaded to surl.jotbins.com for a short link that expires after 30 days " +

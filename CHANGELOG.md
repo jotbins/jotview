@@ -5,6 +5,10 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Tool description and server instructions tell agents that jotbins renders
+  `$…$` / `$$…$$` math, `> [!NOTE]`-style callouts and `:emoji:` shortcodes.
+
 ## [0.5.0] - 2026-10-25
 
 ### Added
