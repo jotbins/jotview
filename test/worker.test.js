@@ -81,6 +81,6 @@ test("read_link fetches surl through the SURL binding", async () => {
     method: "POST",
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read_link", arguments: { url: "https://surl.jotbins.com/abc123" } } }),
   }), env);
-  assert.match((await res.json()).result.content[0].text, /^# Hello/);
+  assert.match((await res.json()).result.content[1].text, /^# Hello/);
   assert.deepEqual(env.surlCalls.map((c) => c.input), ["https://surl.jotbins.com/abc123"]);
 });
