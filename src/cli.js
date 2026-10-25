@@ -4,6 +4,7 @@ import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
 import { mint } from "./mint.js";
 import { serve } from "./mcp-stdio.js";
 import { renderTool } from "./mcp-tool.js";
+import { readTool } from "./mcp-read-tool.js";
 import { openUrl, copyText } from "./platform.js";
 export { DEFAULT_BASE_URL };
 
@@ -270,7 +271,7 @@ async function runMcp(argv, io) {
     write: io.stdout,
     ctx: {
       version: io.version,
-      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl })],
+      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl }), readTool({})],
     },
   });
   return 0;

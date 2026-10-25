@@ -3,7 +3,7 @@
  *
  * jotview is a dual-era server. Clients on the handshake revisions open with
  * `initialize`; clients on 2026-07-28 open with `server/discover` and put the
- * protocol version in every request's `_meta`. The one tool is stateless, so
+ * protocol version in every request's `_meta`. The tools are stateless, so
  * both eras are served from the same handlers and only the envelope differs.
  */
 
@@ -16,7 +16,8 @@ export const INSTRUCTIONS =
   "rendered jotbins page. Show the returned link to the user as a markdown " +
   "link, [title](url); never paste a bare jotbins.com/d URL, it can be " +
   "thousands of characters. Long documents are uploaded to shorten the link " +
-  'unless the user asked to keep them local (shorten: "never").';
+  'unless the user asked to keep them local (shorten: "never"). Use read_link ' +
+  "to get the markdown behind a jotbins link the user shares.";
 
 const META_VERSION = "io.modelcontextprotocol/protocolVersion";
 const META_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities";
