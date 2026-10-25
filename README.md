@@ -90,7 +90,11 @@ it reads a jotbins link you share.
 claude mcp add jotview -- npx -y jotview mcp
 ```
 
-**Claude Desktop, Cursor, and other clients** — add to the MCP config:
+**Claude Desktop** — download `jotview.mcpb` from the
+[latest release](https://github.com/jotbins/jotview/releases/latest) and
+double-click it. Optionally pick a docs folder it may read files from.
+
+**Cursor and other clients** — add to the MCP config:
 
 ```json
 { "mcpServers": { "jotview": { "command": "npx", "args": ["-y", "jotview", "mcp"] } } }
@@ -173,6 +177,21 @@ Input is capped at 1 MB, matching what the `/d` renderer will open.
 ## Requirements
 
 Node 18 or newer.
+
+## Releasing
+
+Releases run from GitHub Actions. On an up-to-date `main`:
+
+```bash
+npm version minor
+git push --follow-tags
+```
+
+`npm version` also updates `manifest.json` and `server.json`. The `v*` tag
+then tests, publishes to npm (trusted publishing, with provenance), attaches
+`jotview.mcpb` to a GitHub release, and updates the MCP Registry entry. Move
+the `Unreleased` notes in `CHANGELOG.md` under the new version first. The
+Worker deploys separately: `cd worker && npx wrangler deploy`.
 
 ## License
 
