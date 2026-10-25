@@ -1,33 +1,53 @@
 name: release
 
 # Push a v* tag (`npm version minor && git push --follow-tags`) to publish.
+# Every step skips work that's already done, so a failed release can be
+# finished with: gh workflow run release.yml -f tag=v1.2.3
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re-)release, e.g. v0.5.0"
+        required: true
 
 permissions:
   contents: write # create the GitHub release
   id-token: write # npm trusted publishing and MCP Registry login
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
       - name: Tag matches package.json
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+        run: |
+          VERSION=$(node -p 'require("./package.json").version')
+          test "v$VERSION" = "$TAG"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - run: npm test
 
       # Trusted publishing needs npm 11.5.1+; it signs provenance on its own.
       - run: npm install -g npm@latest
       - name: Publish to npm
-        run: npm publish
+        run: |
+          if npm view "jotview@$VERSION" version >/dev/null 2>&1; then
+            echo "jotview@$VERSION is already on npm"
+          else
+            npm publish
+          fi
 
       - name: Build the Claude Desktop bundle
         run: npm run bundle
@@ -35,10 +55,30 @@ jobs:
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" jotview.mcpb --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" jotview.mcpb --clobber
+          else
+            gh release create "$TAG" jotview.mcpb --title "$TAG" --generate-notes
+          fi
+
+      # The registry checks npm for the version, and a fresh publish takes a
+      # little while to show up there.
+      - name: Wait for npm to serve the new version
+        run: |
+          for i in $(seq 1 30); do
+            npm view "jotview@$VERSION" version --prefer-online >/dev/null 2>&1 && exit 0
+            sleep 10
+          done
+          echo "jotview@$VERSION still not visible on npm after 5 minutes" >&2
+          exit 1
 
       - name: Publish to the MCP Registry
         run: |
           curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           ./mcp-publisher login github-oidc
-          ./mcp-publisher publish
+          for i in 1 2 3 4 5; do
+            ./mcp-publisher publish && exit 0
+            sleep 30
+          done
+          exit 1

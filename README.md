@@ -193,6 +193,9 @@ then tests, publishes to npm (trusted publishing, with provenance), attaches
 the `Unreleased` notes in `CHANGELOG.md` under the new version first (commit that before `npm version`). The
 Worker deploys separately: `cd worker && npx wrangler deploy`.
 
+If a release run fails partway, fix the cause and finish it with
+`gh workflow run release.yml -f tag=vX.Y.Z` — finished steps are skipped.
+
 ## License
 
 MIT
