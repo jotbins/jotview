@@ -154,9 +154,6 @@ you still get the full link.
 The Worker lives in [`worker/`](worker/) and deploys with
 `cd worker && npx wrangler deploy`.
 
-If a release run fails partway, fix the cause and finish it with
-`gh workflow run release.yml -f tag=vX.Y.Z` — finished steps are skipped.
-
 ## Output contract
 
 **stdout is the URL and nothing else.** Notices, warnings, and errors go to
