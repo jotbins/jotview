@@ -2,6 +2,7 @@
   "name": "jotview",
   "version": "0.4.1",
   "description": "Turn markdown into a jotbins /d link — a CLI and an MCP server. Zero dependencies.",
+  "mcpName": "io.github.jotbins/jotview",
   "type": "module",
   "bin": {
     "jotview": "bin/jotview.js"
@@ -16,7 +17,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "version": "node scripts/sync-version.js && git add manifest.json server.json",
+    "bundle": "npx -y @anthropic-ai/mcpb pack . jotview.mcpb"
   },
   "keywords": [
     "markdown",

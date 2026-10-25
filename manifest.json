@@ -1,0 +1,67 @@
+{
+  "manifest_version": "0.3",
+  "name": "jotview",
+  "display_name": "jotview — jotbins links",
+  "version": "0.4.1",
+  "description": "Turn markdown and Mermaid diagrams into rendered jotbins.com links, and read jotbins links back.",
+  "long_description": "Ask Claude for notes, a report or a Mermaid diagram \"as a jotbins link\" and get a link that opens the page, fully rendered, on jotbins.com. Small documents live entirely inside the link; larger ones are uploaded to surl.jotbins.com for a short link (deleted after 30 days without a visit unless kept). Claude can also read any jotbins link you paste.\n\nOptionally pick a docs folder so Claude can render .md/.txt files from it without pasting them.",
+  "author": {
+    "name": "jotbins",
+    "url": "https://jotbins.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jotbins/jotview.git"
+  },
+  "homepage": "https://github.com/jotbins/jotview#readme",
+  "support": "https://github.com/jotbins/jotview/issues",
+  "license": "MIT",
+  "keywords": [
+    "markdown",
+    "mermaid",
+    "jotbins",
+    "share",
+    "links"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "bin/jotview.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/bin/jotview.js",
+        "mcp",
+        "--allow-dir",
+        "${user_config.docs_dir}"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "render_markdown",
+      "description": "Turn markdown into a rendered jotbins link"
+    },
+    {
+      "name": "read_link",
+      "description": "Get the markdown behind a jotbins link"
+    }
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "docs_dir": {
+      "type": "directory",
+      "title": "Docs folder (optional)",
+      "description": "Claude may render .md, .markdown, .mdx and .txt files from this folder by path. Leave empty to turn file access off.",
+      "required": false
+    }
+  }
+}
