@@ -1,6 +1,8 @@
 import { mint } from "./mint.js";
 import { shorten, DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
 import { JotviewError } from "./codec.js";
+import { readAllowedFile, READABLE_EXTENSIONS } from "./files.js";
+import { basename } from "node:path";
 
 /** Every character of a /d link costs the user tokens twice — once handed
  *  back to the model, once written into its reply — so MCP shortens much
@@ -47,12 +49,39 @@ const DEFINITION = {
 };
 
 /**
+ * The definition, plus a `path` input when the server may read files.
+ * @param {string[]} roots
+ */
+function definitionFor(roots) {
+  if (roots.length === 0) return DEFINITION;
+  const { required: _required, ...schema } = DEFINITION.inputSchema;
+  return {
+    ...DEFINITION,
+    inputSchema: {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        content: { type: "string", description: "The markdown to render. Pass this or path." },
+        path: {
+          type: "string",
+          description:
+            `A ${READABLE_EXTENSIONS.join("/")} file to render instead of content — saves ` +
+            `sending the text. Relative to ${roots[0]}; only files under ` +
+            `${roots.join(", ")} can be read.`,
+        },
+      },
+    },
+  };
+}
+
+/**
  * The first markdown heading, as safe link text.
  * @param {string} md
+ * @param {string} [fallback]  used when there is no heading
  */
-export function docTitle(md) {
+export function docTitle(md, fallback = "jotbins doc") {
   const match = md.match(/^#{1,6}[ \t]+(.+?)[ \t#]*$/m);
-  return linkText(match ? match[1] : "jotbins doc");
+  return linkText(match ? match[1] : fallback);
 }
 
 /** @param {string} text */
@@ -66,8 +95,13 @@ const toolError = (text) => ({ content: [{ type: "text", text }], isError: true 
  * @returns {string|null} what's wrong, phrased for the model to fix
  */
 function validate(args) {
-  if (typeof args.content !== "string") return "content is required: pass the markdown to render as a string.";
-  if (args.content.trim() === "") return "content is empty: pass the markdown to render.";
+  if (args.path !== undefined) {
+    if (args.content !== undefined) return "pass content or path, not both.";
+    if (typeof args.path !== "string" || args.path.trim() === "") return "path must be a file path.";
+  } else {
+    if (typeof args.content !== "string") return "content is required: pass the markdown to render as a string.";
+    if (args.content.trim() === "") return "content is empty: pass the markdown to render.";
+  }
   if (args.keep !== undefined && typeof args.keep !== "boolean") return "keep must be true or false.";
   if (args.title !== undefined && (typeof args.title !== "string" || args.title.trim() === "")) {
     return "title must be a non-empty string, or left out to use the first heading.";
@@ -110,17 +144,31 @@ function describe(r, keepAsked) {
  *   allowUpload?: boolean,
  *   baseUrl?: string,
  *   shortenImpl?: typeof shorten,
- * }} opts  `allowUpload: false` is `jotview mcp --raw`
+ *   roots?: string[],
+ * }} opts  `allowUpload: false` is `jotview mcp --raw`; `roots` (from
+ *   allowedRoots) enables the `path` input
  * @returns {import("./mcp.js").Tool}
  */
 export function renderTool(opts) {
+  const roots = opts.roots ?? [];
   return {
-    definition: DEFINITION,
+    definition: definitionFor(roots),
     async call(args) {
       const problem = validate(args);
       if (problem) return toolError(problem);
 
-      const md = /** @type {string} */ (args.content);
+      const path = /** @type {string|undefined} */ (args.path);
+      let md;
+      if (path === undefined) {
+        md = /** @type {string} */ (args.content);
+      } else {
+        try {
+          md = readAllowedFile(path, roots);
+        } catch (err) {
+          if (err instanceof JotviewError) return toolError(`Can't read that file: ${err.message}.`);
+          throw err;
+        }
+      }
       const keep = args.keep === true;
       let r;
       try {
@@ -133,12 +181,14 @@ export function renderTool(opts) {
           shortenImpl: opts.shortenImpl ?? shorten,
         });
       } catch (err) {
-        if (err instanceof JotviewError) return toolError(`${err.message}. Shorten or split the document.`);
+        if (err instanceof JotviewError) {
+          return toolError(err.code === "too-large" ? `${err.message}. Shorten or split the document.` : `${err.message}.`);
+        }
         throw err;
       }
 
       const text =
-        `[${typeof args.title === "string" ? linkText(args.title) : docTitle(md)}](${r.url})\n\n` +
+        `[${typeof args.title === "string" ? linkText(args.title) : docTitle(md, path && basename(path))}](${r.url})\n\n` +
         `${describe(r, keep && !r.shortened)}\n` +
         "Show it to the user as the markdown link above, not as a bare URL.";
       return { content: [{ type: "text", text }] };

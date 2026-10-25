@@ -91,3 +91,27 @@ test("an unknown flag after mcp is a usage error", async () => {
   assert.equal(stdout, "");
   assert.match(stderr, /--short/);
 });
+
+import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+test("path reads files from the server's working folder", async () => {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "jotview-stdio-")));
+  writeFileSync(join(cwd, "plan.md"), "# From disk\n");
+  const input = line({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "render_markdown", arguments: { path: "plan.md" } } });
+  const stdout = await new Promise((resolve) => {
+    const child = spawn(process.execPath, [BIN, "mcp"], { cwd });
+    let out = "";
+    child.stdout.on("data", (d) => { out += d; });
+    child.on("close", () => resolve(out));
+    child.stdin.end(input);
+  });
+  assert.match(JSON.parse(stdout).result.content[0].text, /^\[From disk\]\(https:\/\/jotbins\.com\/d#z:/);
+});
+
+test("--allow-dir that isn't a folder is a usage error", async () => {
+  const { code, stderr } = await session(["--allow-dir", "/definitely/not/here"], "");
+  assert.equal(code, 2);
+  assert.match(stderr, /not a folder/);
+});

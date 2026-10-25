@@ -3,6 +3,7 @@ import { JotviewError, MAX_DOC_BYTES } from "./codec.js";
 import { DEFAULT_BASE_URL, SHORTENER_URL } from "./shorten.js";
 import { mint } from "./mint.js";
 import { readLink } from "./read.js";
+import { allowedRoots } from "./files.js";
 import { serve } from "./mcp-stdio.js";
 import { renderTool } from "./mcp-tool.js";
 import { readTool } from "./mcp-read-tool.js";
@@ -20,7 +21,8 @@ Usage:
   jotview                   read markdown from stdin
   jotview decode <url>      print the markdown behind a /d or short link
   jotview mcp [--raw]       run as an MCP server (stdio) for AI agents;
-                            --raw never uploads, --base-url works too
+                            --raw never uploads, --base-url works too,
+                            --allow-dir <dir> lets it read files there
 
 Options:
   --raw                     never shorten; always the full /d URL
@@ -113,11 +115,15 @@ export function parseArgs(argv) {
  * @returns {{raw: boolean, baseUrl: string}}
  */
 export function parseMcpArgs(argv) {
-  const opts = { raw: false, baseUrl: DEFAULT_BASE_URL };
+  const opts = { raw: false, baseUrl: DEFAULT_BASE_URL, allowDirs: /** @type {string[]} */ ([]) };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--raw") {
       opts.raw = true;
+    } else if (arg === "--allow-dir") {
+      const value = argv[++i];
+      if (value === undefined) throw new JotviewError("usage", "--allow-dir needs a folder");
+      opts.allowDirs.push(value);
     } else if (arg === "--base-url") {
       const value = argv[++i];
       if (value === undefined || value.startsWith("-") || !/^https?:\/\//.test(value)) {
@@ -293,8 +299,10 @@ async function runDecode(argv, io) {
  */
 async function runMcp(argv, io) {
   let opts;
+  let roots;
   try {
     opts = parseMcpArgs(argv);
+    roots = allowedRoots({ cwd: process.cwd(), extra: opts.allowDirs });
   } catch (err) {
     io.stderr(`jotview: ${/** @type {Error} */ (err).message}\n\n${HELP}`);
     return 2;
@@ -304,7 +312,7 @@ async function runMcp(argv, io) {
     write: io.stdout,
     ctx: {
       version: io.version,
-      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl }), readTool({})],
+      tools: [renderTool({ allowUpload: !opts.raw, baseUrl: opts.baseUrl, roots }), readTool({})],
     },
   });
   return 0;

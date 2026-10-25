@@ -105,6 +105,19 @@ ready-made markdown link, `[First heading](url)`, and a note on whether
 anything was uploaded. It never reads files — the AI passes text it already
 has.
 
+**Rendering files.** The local server can also take a `path` instead of
+`content`, so the AI doesn't have to paste a whole file into the tool call.
+It reads only `.md`, `.markdown`, `.mdx` and `.txt` files, and only inside
+the folder the server runs in (Claude Code starts it in your project) or a
+folder you allow with `--allow-dir`:
+
+```bash
+claude mcp add -s user jotview -- npx -y jotview mcp --allow-dir ~/notes
+```
+
+If the server runs in `/` or your home folder and no `--allow-dir` is given,
+`path` is switched off. The remote server never reads files.
+
 **`read_link`** takes a `url` (a `/d` link or a short link) and returns the
 markdown behind it, so you can paste a link and say *"fix the typos and give
 me a new link."* Links never change; an edit is a new link.
