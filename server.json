@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://mcp.jotbins.com",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "jotview",
-      "version": "0.5.2",
+      "version": "0.6.0",
       "transport": {
         "type": "stdio"
       },
