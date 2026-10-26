@@ -463,7 +463,7 @@ test("decode of a non-jotbins link: stderr, exit 1", async () => {
   const { code, stdout, stderr } = await runCli(["decode", "https://example.com/d#z:AwA"]);
   assert.equal(code, 1);
   assert.equal(stdout, "");
-  assert.match(stderr, /only jotbins\.com\/d links/);
+  assert.match(stderr, /only jotbins\.com\/d and \/p links/);
 });
 
 test("decode needs exactly one URL: usage, exit 2", async () => {

@@ -81,13 +81,45 @@ test("other links are refused without any fetch", async () => {
   const { calls, fetchImpl } = stub(new Error("should not fetch"));
   for (const url of [
     "https://evil.example/d#z:AwA",
-    "https://jotbins.com/p/abc123",
+    "https://jotbins.com/x/abc123",
+    "https://jotbins.com/p/",
+    "https://evil.example/p/abc123",
     "http://surl.jotbins.com/abc",
     "https://surl.jotbins.com/api/create",
     "https://surl.jotbins.com/",
     "not a url",
   ]) {
-    assert.equal((await errorOf(readLink(url, { fetchImpl }))).code, "bad-link", url);
+    assert.equal((await errorOf(readLink(url, { fetchImpl, convexFetchImpl: fetchImpl }))).code, "bad-link", url);
   }
   assert.equal(calls.length, 0);
+});
+
+const queryAnswer = (body) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+
+test("a /p paste link asks Convex's getPaste query for its content", async () => {
+  const { calls, fetchImpl } = stub(queryAnswer({ status: "success", value: { content: MD, title: "Hi" } }));
+  const surl = stub(new Error("should not fetch"));
+  const r = await readLink("https://www.jotbins.com/p/dmhVuSKM", { fetchImpl: surl.fetchImpl, convexFetchImpl: fetchImpl });
+  assert.deepEqual(r, { markdown: MD, url: "https://www.jotbins.com/p/dmhVuSKM" });
+  assert.equal(calls[0].input, "https://coordinated-canary-492.convex.cloud/api/query");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { path: "pastes:getPaste", args: { slug: "dmhVuSKM" }, format: "json" });
+  assert.equal(surl.calls.length, 0);
+});
+
+test("a /p paste that is missing, expired or private is not-found", async () => {
+  const err = await errorOf(readLink("https://jotbins.com/p/abc123", { convexFetchImpl: stub(queryAnswer({ status: "success", value: null })).fetchImpl }));
+  assert.equal(err.code, "not-found");
+  assert.match(err.message, /private/);
+});
+
+test("a /p paste the query can't answer is read-failed", async () => {
+  for (const response of [
+    new Error("ECONNRESET"),
+    queryAnswer({ status: "error", errorMessage: "boom" }),
+    new Response("bad gateway", { status: 502 }),
+  ]) {
+    const err = await errorOf(readLink("https://jotbins.com/p/abc123", { convexFetchImpl: stub(response).fetchImpl }));
+    assert.equal(err.code, "read-failed");
+  }
 });
