@@ -5,6 +5,10 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `read_link` and `decode` read public `jotbins.com/p` pastes, through the
+  same query the site uses; private or expired pastes read as not found.
+
 ### Changed
 - Tool description and server instructions tell agents that jotbins renders
   `$…$` / `$$…$$` math, `> [!NOTE]`-style callouts and `:emoji:` shortcodes.

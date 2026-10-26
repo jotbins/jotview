@@ -21,7 +21,7 @@ entirely in the browser.
 ```
 jotview <file>            mint a link from a file
 jotview                   read markdown from stdin
-jotview decode <url>      print the markdown behind a /d or short link
+jotview decode <url>      print the markdown behind a /d, /p or short link
 jotview mcp [--raw]       run as an MCP server for AI agents
 
   --raw                   never shorten; always the full /d URL
@@ -45,9 +45,10 @@ LINK=$(jotview notes.md --raw)
 jotview decode https://surl.jotbins.com/abc123 > notes.md
 ```
 
-`decode` accepts `jotbins.com/d` links (decoded locally) and
+`decode` accepts `jotbins.com/d` links (decoded locally),
 `surl.jotbins.com` short links (fetched; like a click, that keeps an active
-short link alive).
+short link alive) and public `jotbins.com/p` pastes (fetched from jotbins;
+private pastes read as not found).
 
 ## Shortening, and what it costs you
 
@@ -122,7 +123,7 @@ claude mcp add -s user jotview -- npx -y jotview mcp --allow-dir ~/notes
 If the server runs in `/` or your home folder and no `--allow-dir` is given,
 `path` is switched off. The remote server never reads files.
 
-**`read_link`** takes a `url` (a `/d` link or a short link) and returns the
+**`read_link`** takes a `url` (a `/d` link, a public `/p` paste or a short link) and returns the
 markdown behind it, so you can paste a link and say *"fix the typos and give
 me a new link."* Links never change; an edit is a new link.
 
